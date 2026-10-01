@@ -118,7 +118,9 @@ def test_change_event_freezes_nested_payload() -> None:
 
     assert event.payload == {"details": {"owner": "sam"}, "tags": ("urgent",)}
     with pytest.raises(TypeError):
-        operator.setitem(event.payload, "new", True)
+        # Deliberately illegal: the payload is a read-only Mapping, and mypy 2
+        # now rejects the write statically too. The runtime guard is what's tested.
+        operator.setitem(event.payload, "new", True)  # type: ignore[call-overload]
 
 
 def test_retrieval_query_has_typed_filters_and_bounds() -> None:
