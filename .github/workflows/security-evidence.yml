@@ -1,30 +1,21 @@
 name: Security evidence
 on: {pull_request: null, push: {branches: [main]}, workflow_dispatch: null}
-# pull-requests: read lets gitleaks-action list a PR's commits on pull_request
-# events; without it the scan 403s before running (push runs were unaffected).
-permissions: {contents: read, pull-requests: read}
+permissions: {contents: read}
+concurrency:
+  group: security-evidence-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   evidence:
+    name: Security evidence
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: {fetch-depth: 0, persist-credentials: false}
-      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: "false"
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
-          GITLEAKS_VERSION: "8.30.1"
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6
-        with: {python-version: "3.13"}
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with: {version: "0.11.32", enable-cache: true}
-      - run: uv sync --frozen --all-extras --all-groups
-      - run: uv run bandit -q -r src scripts
-      - run: uv run pip-audit --format cyclonedx-json --output reports/sbom.cdx.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: security-evidence-${{ github.sha }}
-          path: reports/sbom.cdx.json
-          if-no-files-found: error
-          retention-days: 30
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
+        with:
+          version: "0.21.8"
+          verb: call
+          args: security-evidence --commit-sha=${{ github.sha }}
