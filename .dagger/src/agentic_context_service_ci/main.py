@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Final
+from typing import Final, Self
 
 import dagger
-from dagger import Ignore, check, dag, function, object_type
+from dagger import check, dag, field, function, object_type
 
 PYTHON_IMAGE: Final = (
     "python:3.13.14-bookworm@sha256:"
@@ -15,10 +15,16 @@ UV_IMAGE: Final = (
     "ghcr.io/astral-sh/uv:0.11.32@sha256:"
     "df4cae8f3a96d175e2e5f992e597550000edbe78fdc2594d5cd8de1a217f504c"
 )
+NODE_IMAGE: Final = (
+    "node:24.16.0-bookworm-slim@sha256:"
+    "2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203"
+)
 REPOSITORY: Final = "hseshadr/agentic-context-service"
 REPOSITORY_URL: Final = "https://github.com/hseshadr/agentic-context-service.git"
 SOURCE_ROOT: Final = "/src"
 LOCK_INPUTS: Final = ("pyproject.toml", "uv.lock")
+NODE_LOCK_INPUTS: Final = ("package.json", "package-lock.json")
+SBOM_PATH: Final = "/src/reports/sbom.cdx.json"
 SOURCE_IGNORE_PATTERNS: Final = [
     ".git",
     ".env",
@@ -62,13 +68,11 @@ SOURCE_IGNORE_PATTERNS: Final = [
 async def _guard(
     source: dagger.Directory,
     commit_sha: str,
-    git_auth_header: dagger.Secret | None,
 ) -> None:
     guarded = dag.foundation().guard(
         source=source,
         repository=REPOSITORY,
         commit_sha=commit_sha,
-        http_auth_header=git_auth_header,
     )
     await guarded.sync()
 
@@ -76,10 +80,9 @@ async def _guard(
 async def _exact_source(
     source: dagger.Directory,
     commit_sha: str,
-    git_auth_header: dagger.Secret | None,
 ) -> dagger.Directory:
-    await _guard(source, commit_sha, git_auth_header)
-    repository = dag.git(REPOSITORY_URL, http_auth_header=git_auth_header)
+    await _guard(source, commit_sha)
+    repository = dag.git(REPOSITORY_URL)
     return repository.commit(commit_sha).tree(depth=0, include_tags=True)
 
 
@@ -117,20 +120,57 @@ def _project(source: dagger.Directory) -> dagger.Container:
     )
 
 
+def _security_evidence(source: dagger.Directory) -> dagger.Container:
+    """Build the SBOM and retain the existing static security proof in Dagger."""
+    return (
+        _project(source)
+        .with_exec(["uv", "run", "bandit", "-q", "-r", "src", "scripts"])
+        .with_exec(
+            [
+                "uv",
+                "run",
+                "pip-audit",
+                "--format",
+                "cyclonedx-json",
+                "--output",
+                SBOM_PATH,
+            ]
+        )
+    )
+
+
+def _showcase(source: dagger.Directory) -> dagger.Container:
+    """Run the repository's real Playwright Chromium showcase path."""
+    node = dag.container().from_(NODE_IMAGE).directory("/usr/local")
+    locked = _project(source).with_directory("/usr/local", node)
+    locked = locked.with_directory(SOURCE_ROOT, source, include=list(NODE_LOCK_INPUTS))
+    installed = locked.with_env_variable("CI", "1").with_exec(["npm", "ci"])
+    return installed.with_exec(["npm", "run", "install:browser", "--", "--with-deps"]).with_exec(
+        ["npm", "run", "test:ui"]
+    )
+
+
 @object_type
 class AgenticContextService:
     """Expose only the canonical CI and security operations."""
+
+    source: dagger.Directory = field()
+
+    @classmethod
+    def create(cls, workspace: dagger.Workspace) -> Self:
+        """Own the engine-detected workspace instead of accepting caller source."""
+        instance = cls.__new__(cls)
+        instance.source = workspace.directory("/", exclude=SOURCE_IGNORE_PATTERNS)
+        return instance
 
     @function
     @check
     async def ci(
         self,
-        source: Annotated[dagger.Directory, Ignore(SOURCE_IGNORE_PATTERNS)],
         commit_sha: str,
-        git_auth_header: dagger.Secret | None = None,
     ) -> str:
         """Resolve the guarded commit once and run the repository-owned gate."""
-        verified = await _exact_source(source, commit_sha, git_auth_header)
+        verified = await _exact_source(self.source, commit_sha)
         proof = _project(verified).with_exec(
             ["uv", "run", "python", "-m", "scripts.validate_contracts"]
         )
@@ -140,17 +180,14 @@ class AgenticContextService:
     @function
     async def security(
         self,
-        source: Annotated[dagger.Directory, Ignore(SOURCE_IGNORE_PATTERNS)],
         commit_sha: str,
-        git_auth_header: dagger.Secret | None = None,
     ) -> str:
         """Run guarded locked dependency and source security checks."""
-        verified = await _exact_source(source, commit_sha, git_auth_header)
+        verified = await _exact_source(self.source, commit_sha)
         audit = dag.python_package().dependency_audit(
             source=verified,
             repository=REPOSITORY,
             commit_sha=commit_sha,
-            http_auth_header=git_auth_header,
         )
         await audit.sync()
         await (
@@ -159,3 +196,18 @@ class AgenticContextService:
             .sync()
         )
         return "Agentic Context Service dependency and source audits passed"
+
+    @function
+    async def security_evidence(self, commit_sha: str) -> str:
+        """Generate a CycloneDX SBOM and run the source security scan."""
+        verified = await _exact_source(self.source, commit_sha)
+        evidence = await _security_evidence(verified).sync()
+        await evidence.file(SBOM_PATH).contents()
+        return "Agentic Context Service security evidence passed"
+
+    @function
+    async def ui(self, commit_sha: str) -> str:
+        """Exercise the user-facing showcase with real Chromium."""
+        verified = await _exact_source(self.source, commit_sha)
+        await _showcase(verified).sync()
+        return "Agentic Context Service Chromium showcase passed"

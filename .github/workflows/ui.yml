@@ -1,18 +1,9 @@
 name: Showcase UI
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
+on: {pull_request: null, push: {branches: [main]}, workflow_dispatch: null}
+permissions: {contents: read}
 concurrency:
   group: showcase-ui-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   playwright:
     name: Chromium showcase proof
@@ -21,19 +12,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6
+      - uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
         with:
-          python-version: "3.13"
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          version: "0.11.32"
-          enable-cache: true
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-      - run: uv sync --frozen --all-extras --all-groups
-      - run: npm ci
-      - run: npm run install:browser -- --with-deps
-      - run: npm run test:ui
+          version: "0.21.8"
+          verb: call
+          args: ui --commit-sha=${{ github.sha }}
