@@ -46,9 +46,9 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [project.urls]
-Homepage = "https://github.com/hseshadr/agentic-context-service"
-Repository = "https://github.com/hseshadr/agentic-context-service"
-Issues = "https://github.com/hseshadr/agentic-context-service/issues"
+Homepage = "https://github.com/gainratio/agentic-context-service"
+Repository = "https://github.com/gainratio/agentic-context-service"
+Issues = "https://github.com/gainratio/agentic-context-service/issues"
 
 [project.scripts]
 agentic-context = "agentic_context_service.cli:entrypoint"

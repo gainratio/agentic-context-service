@@ -7,7 +7,7 @@ from typing import Final, Self
 import dagger
 from dagger import check, dag, field, function, object_type
 
-from .identity import DEFAULT_REPOSITORY, clone_url, resolve_repository
+from .identity import clone_url, resolve_repository
 
 PYTHON_IMAGE: Final = (
     "python:3.13.14-bookworm@sha256:"
@@ -171,7 +171,7 @@ class AgenticContextService:
     async def ci(
         self,
         commit_sha: str,
-        repository: str = DEFAULT_REPOSITORY,
+        repository: str,
     ) -> str:
         """Resolve the guarded commit once and run the repository-owned gate."""
         verified = await _exact_source(self.source, commit_sha, repository)
@@ -185,7 +185,7 @@ class AgenticContextService:
     async def security(
         self,
         commit_sha: str,
-        repository: str = DEFAULT_REPOSITORY,
+        repository: str,
     ) -> str:
         """Run guarded locked dependency and source security checks."""
         verified = await _exact_source(self.source, commit_sha, repository)
@@ -206,7 +206,7 @@ class AgenticContextService:
     async def security_evidence(
         self,
         commit_sha: str,
-        repository: str = DEFAULT_REPOSITORY,
+        repository: str,
     ) -> str:
         """Generate a CycloneDX SBOM and run the source security scan."""
         verified = await _exact_source(self.source, commit_sha, repository)
@@ -218,7 +218,7 @@ class AgenticContextService:
     async def ui(
         self,
         commit_sha: str,
-        repository: str = DEFAULT_REPOSITORY,
+        repository: str,
     ) -> str:
         """Exercise the user-facing showcase with real Chromium."""
         verified = await _exact_source(self.source, commit_sha, repository)

@@ -4,7 +4,7 @@ A lookup service for your company's AI assistants: each one gets only the facts 
 
 **Try it after cloning: `uv sync && uv run python examples/quickstart/governed_retrieval.py`** (no servers, no API key).
 
-[![CI](https://github.com/hseshadr/agentic-context-service/actions/workflows/dagger.yml/badge.svg)](https://github.com/hseshadr/agentic-context-service/actions/workflows/dagger.yml)
+[![CI](https://github.com/gainratio/agentic-context-service/actions/workflows/dagger.yml/badge.svg)](https://github.com/gainratio/agentic-context-service/actions/workflows/dagger.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 Companies that run several AI assistants (programs that answer questions or propose actions
@@ -26,7 +26,7 @@ You need [uv](https://docs.astral.sh/uv/). It installs Python 3.13 for you if ne
 1. Clone and install:
 
    ```bash
-   git clone https://github.com/hseshadr/agentic-context-service.git
+   git clone https://github.com/gainratio/agentic-context-service.git
    cd agentic-context-service
    uv sync
    ```
