@@ -156,9 +156,9 @@ def test_project_is_mit_licensed_everywhere_it_states_its_license() -> None:
         assert "apache" not in (ROOT / path).read_text().lower(), path
 
 
-# hseshadr/ci main at #64; must stay at or after #46 (dd19871: greenMain tolerates GitHub's rerun
+# hseshadr/ci main at #70; must stay at or after #46 (dd19871: greenMain tolerates GitHub's rerun
 # created_at skew). A pin below it blocks releases whenever main CI is re-run.
-CI_MODULE_PIN = "a895f726e9786bcfd2bdf68f87d3d5c4b411f702"
+CI_MODULE_PIN = "a88866232e679b6353d2b75bceb01969be739f67"
 
 
 def test_ci_modules_pinned_to_reviewed_commit() -> None:
