@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Final
 
-DEFAULT_REPOSITORY: Final = "hseshadr/agentic-context-service"
+# The canonical owner first. The pre-transfer identity stays allowed until the
+# gainratio org move finishes; there is deliberately no default to fall back on.
 ALLOWED_REPOSITORIES: Final = (
-    DEFAULT_REPOSITORY,
     "gainratio/agentic-context-service",
+    "hseshadr/agentic-context-service",
 )
 
 

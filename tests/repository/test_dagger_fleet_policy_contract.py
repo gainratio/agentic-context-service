@@ -86,7 +86,7 @@ def _assert_closed_public_schema(source: str) -> None:
         ]
         assert not method.args.vararg
         assert not method.args.kwarg
-        assert [ast.unparse(item) for item in method.args.defaults] == ["DEFAULT_REPOSITORY"]
+        assert not method.args.defaults, "every gate input is required; no stale default owner"
         assert method.returns is not None
         assert ast.unparse(method.returns) == "str"
         body = ast.unparse(method)

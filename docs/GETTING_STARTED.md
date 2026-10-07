@@ -30,7 +30,7 @@ Local traps we actually hit:
 ## 2. Clone, install, and run it
 
 ```bash
-git clone https://github.com/hseshadr/agentic-context-service.git
+git clone https://github.com/gainratio/agentic-context-service.git
 cd agentic-context-service
 make bootstrap
 uv run python examples/quickstart/governed_retrieval.py
