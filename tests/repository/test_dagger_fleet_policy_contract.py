@@ -80,14 +80,17 @@ def _assert_closed_public_schema(source: str) -> None:
     for method in methods:
         arguments = (*method.args.posonlyargs, *method.args.args, *method.args.kwonlyargs)
         public = tuple(item for item in arguments if item.arg != "self")
-        assert [(item.arg, _annotation(item)) for item in public] == [("commit_sha", "str")]
+        assert [(item.arg, _annotation(item)) for item in public] == [
+            ("commit_sha", "str"),
+            ("repository", "str"),
+        ]
         assert not method.args.vararg
         assert not method.args.kwarg
-        assert len(method.args.defaults) == 0
+        assert [ast.unparse(item) for item in method.args.defaults] == ["DEFAULT_REPOSITORY"]
         assert method.returns is not None
         assert ast.unparse(method.returns) == "str"
         body = ast.unparse(method)
-        assert "_exact_source(self.source, commit_sha)" in body
+        assert "_exact_source(self.source, commit_sha, repository)" in body
 
 
 def _workflow_steps(name: str, source: str | None = None) -> list[dict[str, object]]:
@@ -124,7 +127,10 @@ def _assert_thin_workflow(name: str, source: str | None = None) -> None:
     assert dagger.get("with") == {
         "version": "0.21.8",
         "verb": "call",
-        "args": f"{EXPECTED_INGRESS[name]} --commit-sha=${{{{ github.sha }}}}",
+        "args": (
+            f"{EXPECTED_INGRESS[name]} --commit-sha=${{{{ github.sha }}}}"
+            " --repository=${{ github.repository }}"
+        ),
     }
 
 
@@ -185,6 +191,26 @@ def test_contract_rejects_the_legacy_raw_shell_ingress() -> None:
     )
     assert workflow != (WORKFLOWS / "dagger.yml").read_text()
     with pytest.raises(AssertionError, match="checkout followed by one Dagger call"):
+        _assert_thin_workflow("dagger.yml", workflow)
+
+
+def test_guard_and_clone_use_the_resolved_run_identity() -> None:
+    body = _function_body("_exact_source")
+    assert "resolve_repository(repository)" in body
+    assert "_guard(source, commit_sha, verified)" in body
+    assert "dag.git(clone_url(verified))" in body
+    assert "repository=repository" in _function_body("_guard")
+    assert "REPOSITORY_URL" not in MODULE.read_text()
+
+
+def test_contract_rejects_a_workflow_that_drops_the_run_identity() -> None:
+    workflow = (
+        (WORKFLOWS / "dagger.yml")
+        .read_text()
+        .replace(" --repository=${{ github.repository }}", "", 1)
+    )
+    assert workflow != (WORKFLOWS / "dagger.yml").read_text()
+    with pytest.raises(AssertionError):
         _assert_thin_workflow("dagger.yml", workflow)
 
 

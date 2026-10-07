@@ -18,4 +18,4 @@ jobs:
         with:
           version: "0.21.8"
           verb: call
-          args: ui --commit-sha=${{ github.sha }}
+          args: ui --commit-sha=${{ github.sha }} --repository=${{ github.repository }}
