@@ -1,0 +1,5 @@
+self-hosted-runner:
+  labels:
+    - depot-ubuntu-24.04-4
+    - depot-ubuntu-24.04-8
+    - depot-ubuntu-24.04-4,dagger=0.21.8
