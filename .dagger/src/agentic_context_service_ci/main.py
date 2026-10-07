@@ -7,6 +7,8 @@ from typing import Final, Self
 import dagger
 from dagger import check, dag, field, function, object_type
 
+from .identity import DEFAULT_REPOSITORY, clone_url, resolve_repository
+
 PYTHON_IMAGE: Final = (
     "python:3.13.14-bookworm@sha256:"
     "8b9a8b28d9cc221c6ab5d40e9cfcd99429959f6a8f5171612a99147975ab043f"
@@ -19,8 +21,6 @@ NODE_IMAGE: Final = (
     "node:24.16.0-bookworm-slim@sha256:"
     "2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203"
 )
-REPOSITORY: Final = "hseshadr/agentic-context-service"
-REPOSITORY_URL: Final = "https://github.com/hseshadr/agentic-context-service.git"
 SOURCE_ROOT: Final = "/src"
 LOCK_INPUTS: Final = ("pyproject.toml", "uv.lock")
 NODE_LOCK_INPUTS: Final = ("package.json", "package-lock.json")
@@ -68,10 +68,11 @@ SOURCE_IGNORE_PATTERNS: Final = [
 async def _guard(
     source: dagger.Directory,
     commit_sha: str,
+    repository: str,
 ) -> None:
     guarded = dag.foundation().guard(
         source=source,
-        repository=REPOSITORY,
+        repository=repository,
         commit_sha=commit_sha,
     )
     await guarded.sync()
@@ -80,10 +81,12 @@ async def _guard(
 async def _exact_source(
     source: dagger.Directory,
     commit_sha: str,
+    repository: str,
 ) -> dagger.Directory:
-    await _guard(source, commit_sha)
-    repository = dag.git(REPOSITORY_URL)
-    return repository.commit(commit_sha).tree(depth=0, include_tags=True)
+    verified = resolve_repository(repository)
+    await _guard(source, commit_sha, verified)
+    remote = dag.git(clone_url(verified))
+    return remote.commit(commit_sha).tree(depth=0, include_tags=True)
 
 
 def _dependencies(source: dagger.Directory) -> dagger.Container:
@@ -168,9 +171,10 @@ class AgenticContextService:
     async def ci(
         self,
         commit_sha: str,
+        repository: str = DEFAULT_REPOSITORY,
     ) -> str:
         """Resolve the guarded commit once and run the repository-owned gate."""
-        verified = await _exact_source(self.source, commit_sha)
+        verified = await _exact_source(self.source, commit_sha, repository)
         proof = _project(verified).with_exec(
             ["uv", "run", "python", "-m", "scripts.validate_contracts"]
         )
@@ -181,12 +185,13 @@ class AgenticContextService:
     async def security(
         self,
         commit_sha: str,
+        repository: str = DEFAULT_REPOSITORY,
     ) -> str:
         """Run guarded locked dependency and source security checks."""
-        verified = await _exact_source(self.source, commit_sha)
+        verified = await _exact_source(self.source, commit_sha, repository)
         audit = dag.python_package().dependency_audit(
             source=verified,
-            repository=REPOSITORY,
+            repository=repository,
             commit_sha=commit_sha,
         )
         await audit.sync()
@@ -198,16 +203,24 @@ class AgenticContextService:
         return "Agentic Context Service dependency and source audits passed"
 
     @function
-    async def security_evidence(self, commit_sha: str) -> str:
+    async def security_evidence(
+        self,
+        commit_sha: str,
+        repository: str = DEFAULT_REPOSITORY,
+    ) -> str:
         """Generate a CycloneDX SBOM and run the source security scan."""
-        verified = await _exact_source(self.source, commit_sha)
+        verified = await _exact_source(self.source, commit_sha, repository)
         evidence = await _security_evidence(verified).sync()
         await evidence.file(SBOM_PATH).contents()
         return "Agentic Context Service security evidence passed"
 
     @function
-    async def ui(self, commit_sha: str) -> str:
+    async def ui(
+        self,
+        commit_sha: str,
+        repository: str = DEFAULT_REPOSITORY,
+    ) -> str:
         """Exercise the user-facing showcase with real Chromium."""
-        verified = await _exact_source(self.source, commit_sha)
+        verified = await _exact_source(self.source, commit_sha, repository)
         await _showcase(verified).sync()
         return "Agentic Context Service Chromium showcase passed"
