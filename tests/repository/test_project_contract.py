@@ -156,14 +156,17 @@ def test_project_is_mit_licensed_everywhere_it_states_its_license() -> None:
         assert "apache" not in (ROOT / path).read_text().lower(), path
 
 
-# hseshadr/ci main at #70; must stay at or after #46 (dd19871: greenMain tolerates GitHub's rerun
-# created_at skew). A pin below it blocks releases whenever main CI is re-run.
+# gainratio/ci (moved from hseshadr/ci, same history) main at #70; must stay at or after #46
+# (dd19871: greenMain tolerates GitHub's rerun created_at skew). A pin below it blocks
+# releases whenever main CI is re-run.
 CI_MODULE_PIN = "a88866232e679b6353d2b75bceb01969be739f67"
 
 
 def test_ci_modules_pinned_to_reviewed_commit() -> None:
     deps = json.loads((ROOT / "dagger.json").read_text())["dependencies"]
-    ci_deps = {d["name"]: d for d in deps if "github.com/hseshadr/ci/" in d["source"]}
+    # GitHub redirects git fetches for moved repos today, but not forever: pin the new owner.
+    assert not [d for d in deps if "github.com/hseshadr/ci/" in d["source"]]
+    ci_deps = {d["name"]: d for d in deps if "github.com/gainratio/ci/" in d["source"]}
     assert set(ci_deps) == {"foundation", "python-package"}
     for dep in ci_deps.values():
         assert dep["source"].endswith(f"@{CI_MODULE_PIN}"), dep
