@@ -93,8 +93,10 @@ returns the top passages with their sources and ages.
 ## Run the full local stack
 
 This runs PostgreSQL, Debezium, Redpanda, OpenSearch, OPA, the API, and the indexer in Docker.
-You need Docker with Compose v2, at least 4 GiB of memory for Docker, and `make`. Every image
-is published for amd64 and arm64, so Apple silicon runs it without emulation.
+You need Docker with Compose v2, at least 4 GiB of memory for Docker, and `make`. `make up`
+checks Docker's memory first and stops with a clear message if it is too small; set
+`ACS_SKIP_MEMORY_CHECK=1` to try anyway. Every image is published for amd64 and arm64, so Apple
+silicon runs it without emulation.
 
 ```bash
 cp .env.example .env

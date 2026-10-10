@@ -93,6 +93,8 @@ services:
       CONFIG_STORAGE_REPLICATION_FACTOR: "1"
       OFFSET_STORAGE_REPLICATION_FACTOR: "1"
       STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      # Kafka Connect defaults to -Xmx2G, which got Debezium OOM-killed in small Docker VMs.
+      HEAP_OPTS: -Xms256M -Xmx512M
     ports: ["8083:8083"]
     depends_on:
       postgres: {condition: service_healthy}

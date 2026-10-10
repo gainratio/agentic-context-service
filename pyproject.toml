@@ -133,7 +133,9 @@ ui-install = [{ cmd = "npm ci" }, { cmd = "npm run install:browser" }]
 ui = { cmd = "npm run test:ui" }
 lint = ["format-check", "lint-check", "typecheck", "complexity"]
 verify = ["lint", "unit", "integration", "bdd", "security", "eval"]
-up = "docker compose -f deploy/compose/docker-compose.yml up -d --wait"
+docker-memory-check = "python -m scripts.check_docker_memory"
+compose-up = "docker compose -f deploy/compose/docker-compose.yml up -d --wait"
+up = ["docker-memory-check", "compose-up"]
 seed = "python -m scripts.seed_demo"
 demo = "python -m scripts.run_demo"
 down = "docker compose -f deploy/compose/docker-compose.yml down"

@@ -11,7 +11,7 @@ here was run on macOS (Apple silicon) from a fresh clone on 2026-09-25; times ar
 | Python | 3.13 exactly (`>=3.13,<3.14`) | You do not need to install it. `uv` downloads 3.13 on first sync if your system Python is different. |
 | `make` | any | Preinstalled on macOS and most Linux systems. Every target is a thin wrapper around `uv run poe <task>`. |
 | Node.js + npm | Node 22 or later | Only for the browser test (`make ui`). |
-| Docker with Compose v2 | recent, with at least 4 GiB of memory | Only for the full local stack (`make up`). Redpanda reserves 768 MiB and OpenSearch about 1 GiB; give Docker Desktop 4 GiB under Settings > Resources. |
+| Docker with Compose v2 | recent, with at least 4 GiB of memory | Only for the full local stack (`make up`). Redpanda reserves 768 MiB and OpenSearch about 1 GiB; give Docker Desktop 4 GiB under Settings > Resources. `make up` refuses a smaller Docker VM; `ACS_SKIP_MEMORY_CHECK=1 make up` skips that check. |
 | [Dagger](https://docs.dagger.io/) | 0.21.8 | Optional. Only to run the exact CI container locally. |
 
 Local traps we actually hit:

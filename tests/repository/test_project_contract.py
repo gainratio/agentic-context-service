@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -251,5 +252,47 @@ def test_docs_no_longer_warn_that_a_dotenv_breaks_the_suite() -> None:
 
 
 def test_docs_state_the_docker_memory_the_local_stack_needs() -> None:
-    for path in ("README.md", "docs/GETTING_STARTED.md"):
-        assert "4 GiB" in (ROOT / path).read_text(), f"{path} omits the Docker memory minimum"
+    requirements = {
+        "README.md": "You need Docker with Compose v2, at least 4 GiB of memory for Docker",
+        "docs/GETTING_STARTED.md": (
+            "| Docker with Compose v2 | recent, with at least 4 GiB of memory |"
+        ),
+    }
+    for path, sentence in requirements.items():
+        text = " ".join((ROOT / path).read_text().split())
+        assert sentence in text, f"{path} omits the Docker memory requirement"
+        assert "ACS_SKIP_MEMORY_CHECK=1" in text, f"{path} omits the preflight override"
+
+
+# Each JVM image and the environment variable its entrypoint reads JVM heap flags from.
+_JVM_HEAP_VARIABLES = {
+    "quay.io/debezium/connect": "HEAP_OPTS",
+    "opensearchproject/opensearch": "OPENSEARCH_JAVA_OPTS",
+}
+
+
+def test_every_jvm_service_caps_its_heap() -> None:
+    # Debezium's Kafka Connect default is -Xmx2G, which OOM-killed it in a 2.8 GiB Docker VM.
+    jvm_services = {
+        name: (svc, variable)
+        for name, svc in _compose_services().items()
+        for image, variable in _JVM_HEAP_VARIABLES.items()
+        if str(svc.get("image", "")).startswith(image)
+    }
+    uncapped = []
+    for name, (svc, variable) in jvm_services.items():
+        environment = svc.get("environment")
+        assert isinstance(environment, dict)
+        if "-Xmx" not in str(environment.get(variable, "")):
+            uncapped.append(name)
+
+    assert set(jvm_services) == {"debezium", "opensearch"}
+    assert not uncapped, f"JVM services without an explicit -Xmx: {uncapped}"
+
+
+def test_make_up_runs_the_docker_memory_preflight_before_compose() -> None:
+    tasks = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["poe"]["tasks"]
+
+    assert tasks["up"] == ["docker-memory-check", "compose-up"]
+    assert tasks["docker-memory-check"] == "python -m scripts.check_docker_memory"
+    assert tasks["compose-up"].startswith("docker compose -f deploy/compose/docker-compose.yml up")
