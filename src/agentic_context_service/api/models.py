@@ -90,6 +90,10 @@ class SourceEvidence(APIModel):
     uri: str | None = Field(default=None, max_length=2_048)
 
 
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 class MemoryCreateRequest(APIModel):
     namespace: MemoryNamespace
     memory_type: str = Field(min_length=1, max_length=128)
@@ -97,11 +101,19 @@ class MemoryCreateRequest(APIModel):
     source_evidence: tuple[SourceEvidence, ...] = Field(default=(), max_length=100)
     expires_at: AwareDatetime | None = None
 
+    @field_validator("expires_at", mode="before")
+    @classmethod
+    def require_iso_string(cls, value: object) -> object:
+        # The contract is string/date-time; lax parsing would also take a bare epoch number.
+        if value is not None and not isinstance(value, str):
+            raise ValueError("expires_at must be an ISO 8601 string")
+        return value
+
     @field_validator("expires_at")
     @classmethod
     def require_future_expiry(cls, value: AwareDatetime | None) -> AwareDatetime | None:
         # Search hides expired memories, so storing one would report "created" for nothing.
-        if value is not None and value <= datetime.now(UTC):
+        if value is not None and value <= _utc_now():
             raise ValueError("expires_at must be in the future")
         return value
 

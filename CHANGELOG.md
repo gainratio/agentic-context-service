@@ -29,6 +29,9 @@ versioning.
 
 ### Changed
 
-- `POST /v1/memories` rejects an `expires_at` that is not a future, timezone-qualified instant
-  with `400 INVALID_REQUEST`. It previously stored the memory, answered `created`, and then never
-  returned it from search.
+- `POST /v1/memories` rejects an `expires_at` that is not a future, timezone-qualified ISO 8601
+  string (including one equal to now, or a bare epoch number) with `400 INVALID_REQUEST`. It
+  previously stored the memory, answered `created`, and then never returned it from search.
+- The OPA image is pinned by the digest of its multi-arch index.
+- README and getting-started docs state the 4 GiB Docker memory minimum and drop the stale
+  "run `make verify` without a `.env`" workaround.

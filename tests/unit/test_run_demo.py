@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import itertools
 import urllib.error
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -263,20 +264,48 @@ def test_await_initial_context_retries_while_the_api_warms_up(
     assert run_demo._await_initial_context() == valid
 
 
-def test_await_initial_context_gives_up_after_its_deadline(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    clock = iter([0.0, 0.0, 61.0])
+_RUNAWAY_LIMIT = 50
 
-    def always_times_out(*_args: object) -> dict[str, object]:
-        raise TimeoutError("timed out")
 
-    monkeypatch.setattr(run_demo, "_request", always_times_out)
+def _stall_the_api(monkeypatch: pytest.MonkeyPatch, failure: Exception | None = None) -> None:
+    # The fake clock jumps 10 s per read, so a loop that honours its deadline stops after a few
+    # calls. A loop that ignores it hits the runaway limit and fails fast instead of hanging.
+    calls = itertools.count(1)
+    clock = itertools.count(0.0, 10.0)
+
+    def stalled_request(*_args: object) -> dict[str, object]:
+        if next(calls) > _RUNAWAY_LIMIT:
+            raise AssertionError("polling loop ignored its deadline")
+        if failure is not None:
+            raise failure
+        return {"results": [], "items": []}
+
+    monkeypatch.setattr(run_demo, "_request", stalled_request)
     monkeypatch.setattr(run_demo.time, "monotonic", lambda: next(clock))
     monkeypatch.setattr(run_demo.time, "sleep", lambda _seconds: None)
 
+
+def test_await_initial_context_gives_up_after_its_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stall_the_api(monkeypatch, TimeoutError("timed out"))
+
     with pytest.raises(TimeoutError, match="initial hybrid retrieval"):
         run_demo._await_initial_context()
+
+
+def test_await_version_gives_up_after_its_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    _stall_the_api(monkeypatch)
+
+    with pytest.raises(TimeoutError, match="CDC source version 2"):
+        run_demo._await_version("2")
+
+
+def test_await_memory_gives_up_after_its_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    _stall_the_api(monkeypatch)
+
+    with pytest.raises(TimeoutError, match="mem-1 was not searchable"):
+        run_demo._await_memory("mem-1")
 
 
 def test_await_initial_context_surfaces_http_errors_immediately(

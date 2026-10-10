@@ -188,10 +188,14 @@ def test_local_stack_runs_natively_on_every_host_architecture() -> None:
 
 
 def test_local_opa_uses_the_multi_arch_static_image() -> None:
-    # Only OPA's "-static" tags publish linux/arm64; the plain tag is amd64-only.
+    # Only OPA's "-static" tags publish linux/arm64; the plain tag is amd64-only. The digest is
+    # the multi-arch index (linux/amd64 + linux/arm64), so the pin keeps both architectures.
     opa = _compose_services()["opa"]
 
-    assert opa["image"] == "openpolicyagent/opa:1.8.0-static"
+    assert opa["image"] == (
+        "openpolicyagent/opa:1.8.0-static"
+        "@sha256:3c350b0f3130e71000c43c859e1479d8bb9c693442e7e5180e59026b61c068a1"
+    )
 
 
 def test_local_opa_healthcheck_execs_the_opa_binary_without_a_shell() -> None:
@@ -235,3 +239,17 @@ def test_openapi_documents_the_past_expiry_rejection() -> None:
     description = _create_memory_field("responses", "400", "description")
 
     assert "expires_at" in str(description)
+
+
+def test_docs_no_longer_warn_that_a_dotenv_breaks_the_suite() -> None:
+    # tests/conftest.py isolates Settings from .env; the old workaround text is now false.
+    stale = ("without a `.env`", "breaks one test", "rename it while you check")
+    docs = {path: (ROOT / path).read_text() for path in ("README.md", "docs/GETTING_STARTED.md")}
+
+    found = [(path, phrase) for path, text in docs.items() for phrase in stale if phrase in text]
+    assert not found, f"stale .env workaround text: {found}"
+
+
+def test_docs_state_the_docker_memory_the_local_stack_needs() -> None:
+    for path in ("README.md", "docs/GETTING_STARTED.md"):
+        assert "4 GiB" in (ROOT / path).read_text(), f"{path} omits the Docker memory minimum"

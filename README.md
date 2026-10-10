@@ -93,7 +93,8 @@ returns the top passages with their sources and ages.
 ## Run the full local stack
 
 This runs PostgreSQL, Debezium, Redpanda, OpenSearch, OPA, the API, and the indexer in Docker.
-You need Docker with Compose v2 and `make`.
+You need Docker with Compose v2, at least 4 GiB of memory for Docker, and `make`. Every image
+is published for amd64 and arm64, so Apple silicon runs it without emulation.
 
 ```bash
 cp .env.example .env
@@ -117,9 +118,10 @@ make verify
 ```
 
 `make verify` runs the same checks as CI: lint, strict type checks, tests with at least 90%
-coverage, security scans, and a retrieval-quality evaluation. It takes about a minute. Run it
-without a `.env` file in the folder. [Getting started for developers](docs/GETTING_STARTED.md)
-covers prerequisites, a map of the code, and a walkthrough of a first change.
+coverage, security scans, and a retrieval-quality evaluation. It takes about a minute. The tests
+ignore any `.env` file, so it is safe to run after the quickstart above.
+[Getting started for developers](docs/GETTING_STARTED.md) covers prerequisites, a map of the
+code, and a walkthrough of a first change.
 
 ## More detail
 
