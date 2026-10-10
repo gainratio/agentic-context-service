@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -212,3 +213,25 @@ def test_make_targets_ignore_a_foreign_active_virtualenv() -> None:
     makefile_lines = (ROOT / "Makefile").read_text().splitlines()
 
     assert "unexport VIRTUAL_ENV" in makefile_lines
+
+
+def _create_memory_field(*path: str) -> object:
+    node: object = yaml.safe_load((ROOT / "packages/contracts/openapi.yaml").read_text())
+    for key in ("paths", "/v1/memories", "post", *path):
+        assert isinstance(node, dict), f"openapi createMemory has no {key!r}"
+        node = node[key]
+    return node
+
+
+def test_openapi_create_memory_example_is_accepted_by_the_api() -> None:
+    # The API rejects a past expiry, so a dated example must stay in the future.
+    content = ("requestBody", "content", "application/json", "example", "expires_at")
+    expires_at = datetime.fromisoformat(str(_create_memory_field(*content)))
+
+    assert expires_at > datetime.now(UTC)
+
+
+def test_openapi_documents_the_past_expiry_rejection() -> None:
+    description = _create_memory_field("responses", "400", "description")
+
+    assert "expires_at" in str(description)

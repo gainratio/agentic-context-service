@@ -115,12 +115,17 @@ paths:
               memory_type: working
               text: The analyst prefers margin deltas as percentages.
               source_evidence: []
-              expires_at: '2026-09-20T00:00:00Z'
+              expires_at: '2099-01-01T00:00:00Z'
       responses:
         '201':
           description: Memory stored.
           content: {application/json: {schema: {$ref: '#/components/schemas/OperationReceipt'}}}
-        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '400':
+          description: >-
+            Invalid public request (code INVALID_REQUEST). This includes an expires_at that is
+            not a future instant with a timezone offset: an already-expired memory would never
+            be searchable, so it is rejected instead of stored.
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
         '403': {$ref: '#/components/responses/Denied'}
         '424': {$ref: '#/components/responses/AuthorizationDependency'}
   /v1/memories:search:
@@ -416,7 +421,10 @@ components:
         memory_type: {type: string, minLength: 1, maxLength: 128}
         text: {type: string, minLength: 1, maxLength: 50000}
         source_evidence: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/SourceEvidence'}}
-        expires_at: {type: [string, 'null'], format: date-time}
+        expires_at:
+          type: [string, 'null']
+          format: date-time
+          description: Must be in the future and include a timezone offset; otherwise 400.
     MemoryNamespace:
       type: object
       additionalProperties: false

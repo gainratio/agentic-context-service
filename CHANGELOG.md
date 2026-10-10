@@ -24,3 +24,11 @@ versioning.
 - `make demo` step 6 no longer creates a memory that has already expired, and step 1 waits
   through the API's cold first query instead of failing on a 10-second socket timeout.
 - `make` targets ignore another project's activated `VIRTUAL_ENV`.
+- The test suite ignores a developer's local `.env`, so `make verify` passes after the
+  quickstart's `cp .env.example .env`.
+
+### Changed
+
+- `POST /v1/memories` rejects an `expires_at` that is not a future, timezone-qualified instant
+  with `400 INVALID_REQUEST`. It previously stored the memory, answered `created`, and then never
+  returned it from search.

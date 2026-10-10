@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from types import SimpleNamespace
 from typing import Any
@@ -444,6 +444,58 @@ async def test_validation_errors_use_the_public_stable_error_contract() -> None:
         "request_id": "req-1",
         "retryable": False,
     }
+
+
+async def _create_memory(expires_at: str) -> tuple[httpx.Response, RecordingService]:
+    secret = b"a sufficiently long test signing secret"
+    service = RecordingService()
+    app = create_app(service=service, signing_secret=secret, authenticator=_authenticator())
+    body = {
+        "namespace": {
+            "environment": "test",
+            "workflow_id": "place-order",
+            "workflow_revision": "1",
+            "session_id": "session-1",
+        },
+        "memory_type": "working",
+        "text": "remember",
+        "expires_at": expires_at,
+    }
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/v1/memories", headers=_signed_headers(secret), json=body)
+    return response, service
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "expires_at",
+    [
+        "2026-09-20T00:00:00Z",
+        (datetime.now(UTC) - timedelta(seconds=1)).isoformat(),
+        "2999-01-01T00:00:00",
+    ],
+    ids=["past", "just-expired", "no-timezone"],
+)
+async def test_memory_create_rejects_an_expiry_that_is_not_a_future_instant(
+    expires_at: str,
+) -> None:
+    # An already-expired memory was stored as "created" and then never searchable.
+    response, service = await _create_memory(expires_at)
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_REQUEST"
+    assert service.calls == []
+
+
+@pytest.mark.asyncio
+async def test_memory_create_accepts_a_future_expiry() -> None:
+    expires_at = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+
+    response, service = await _create_memory(expires_at)
+
+    assert response.status_code == 201
+    assert [operation for operation, _payload in service.calls] == ["memory.create"]
 
 
 @pytest.mark.asyncio

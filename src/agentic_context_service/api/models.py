@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _MAX_FILTER_VALUES = 100
 _ALLOWED_FILTERS = {
@@ -95,7 +95,15 @@ class MemoryCreateRequest(APIModel):
     memory_type: str = Field(min_length=1, max_length=128)
     text: str = Field(min_length=1, max_length=50_000)
     source_evidence: tuple[SourceEvidence, ...] = Field(default=(), max_length=100)
-    expires_at: datetime | None = None
+    expires_at: AwareDatetime | None = None
+
+    @field_validator("expires_at")
+    @classmethod
+    def require_future_expiry(cls, value: AwareDatetime | None) -> AwareDatetime | None:
+        # Search hides expired memories, so storing one would report "created" for nothing.
+        if value is not None and value <= datetime.now(UTC):
+            raise ValueError("expires_at must be in the future")
+        return value
 
 
 class MemorySearchRequest(APIModel):
