@@ -171,3 +171,44 @@ def test_ci_modules_pinned_to_reviewed_commit() -> None:
     for dep in ci_deps.values():
         assert dep["source"].endswith(f"@{CI_MODULE_PIN}"), dep
         assert dep["pin"] == CI_MODULE_PIN, dep
+
+
+def _compose_services() -> dict[str, dict[str, object]]:
+    compose = yaml.safe_load((ROOT / "deploy/compose/docker-compose.yml").read_text())
+    services: dict[str, dict[str, object]] = compose["services"]
+    return services
+
+
+def test_local_stack_runs_natively_on_every_host_architecture() -> None:
+    # A platform pin forces emulation on Apple silicon; amd64 OPA segfaults there.
+    pinned = sorted(name for name, svc in _compose_services().items() if "platform" in svc)
+
+    assert not pinned, f"services pinned to one platform: {pinned}"
+
+
+def test_local_opa_uses_the_multi_arch_static_image() -> None:
+    # Only OPA's "-static" tags publish linux/arm64; the plain tag is amd64-only.
+    opa = _compose_services()["opa"]
+
+    assert opa["image"] == "openpolicyagent/opa:1.8.0-static"
+
+
+def test_local_opa_healthcheck_execs_the_opa_binary_without_a_shell() -> None:
+    healthcheck = _compose_services()["opa"]["healthcheck"]
+    assert isinstance(healthcheck, dict)
+
+    assert healthcheck["test"][:2] == ["CMD", "/opa"]
+
+
+def test_local_stack_images_avoid_the_retired_personal_mirror() -> None:
+    images = [str(svc["image"]) for svc in _compose_services().values() if "image" in svc]
+
+    assert images
+    assert not [image for image in images if "hseshadr" in image]
+
+
+def test_make_targets_ignore_a_foreign_active_virtualenv() -> None:
+    # uv warns when VIRTUAL_ENV points at another project's venv; make must not inherit it.
+    makefile_lines = (ROOT / "Makefile").read_text().splitlines()
+
+    assert "unexport VIRTUAL_ENV" in makefile_lines

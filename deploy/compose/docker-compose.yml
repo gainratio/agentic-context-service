@@ -171,8 +171,7 @@ services:
     restart: "no"
 
   opa:
-    image: openpolicyagent/opa:1.8.0
-    platform: linux/amd64
+    image: openpolicyagent/opa:1.8.0-static
     command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies"]
     ports: ["8181:8181"]
     volumes:

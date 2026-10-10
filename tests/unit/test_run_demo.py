@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import urllib.error
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from email.message import Message
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
@@ -87,6 +90,23 @@ def test_memory_create_uses_authenticated_demo_subject(monkeypatch: pytest.Monke
     assert captured["path"] == "/v1/memories"
     namespace = captured["payload"]["namespace"]
     assert namespace["user_id"] == "demo-analyst"
+
+
+def test_memory_create_expires_in_the_future(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Search hides expired memories, so a fixed past expiry made step 6 time out forever.
+    captured: dict[str, Any] = {}
+
+    def fake_request(path: str, payload: dict[str, object]) -> dict[str, object]:
+        captured["payload"] = payload
+        return {"id": "mem-1", "status": "created"}
+
+    monkeypatch.setattr(run_demo, "_request", fake_request)
+
+    run_demo._memory()
+
+    expires_at = datetime.fromisoformat(str(captured["payload"]["expires_at"]))
+    remaining = expires_at - datetime.now(UTC)
+    assert timedelta(hours=23) < remaining <= timedelta(days=1)
 
 
 def test_await_memory_searches_namespace_until_created_id_is_returned(
@@ -192,7 +212,7 @@ def test_initial_context_requires_citation_freshness_and_component_ranks() -> No
     assert run_demo._has_initial_context({"results": []}) is False
 
 
-def test_await_initial_context_retries_until_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+def _valid_initial_context() -> dict[str, object]:
     valid = _result("NORTHSTAR-104", "1")
     item = cast(dict[str, object], cast(list[object], valid["results"])[0])
     item["citation"] = {
@@ -203,9 +223,73 @@ def test_await_initial_context_retries_until_valid(monkeypatch: pytest.MonkeyPat
     }
     item["freshness"] = {"age_seconds": 2}
     item["component_ranks"] = {"lexical": 1, "semantic": 1}
+    return valid
+
+
+def test_await_initial_context_retries_until_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+    valid = _valid_initial_context()
     responses = iter([{"results": []}, valid])
     monkeypatch.setattr(run_demo, "_request", lambda *_args: next(responses))
     monkeypatch.setattr(run_demo.time, "monotonic", lambda: 0.0)
     monkeypatch.setattr(run_demo.time, "sleep", lambda _seconds: None)
 
     assert run_demo._await_initial_context() == valid
+
+
+@pytest.mark.parametrize(
+    "transient",
+    [
+        TimeoutError("timed out"),
+        urllib.error.URLError(ConnectionRefusedError(61, "Connection refused")),
+    ],
+)
+def test_await_initial_context_retries_while_the_api_warms_up(
+    monkeypatch: pytest.MonkeyPatch, transient: OSError
+) -> None:
+    # A fresh API loads its embedding model on the first query, which can outlast one request.
+    valid = _valid_initial_context()
+    failures = iter([transient])
+
+    def flaky_request(*_args: object) -> dict[str, object]:
+        failure = next(failures, None)
+        if failure is not None:
+            raise failure
+        return valid
+
+    monkeypatch.setattr(run_demo, "_request", flaky_request)
+    monkeypatch.setattr(run_demo.time, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(run_demo.time, "sleep", lambda _seconds: None)
+
+    assert run_demo._await_initial_context() == valid
+
+
+def test_await_initial_context_gives_up_after_its_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = iter([0.0, 0.0, 61.0])
+
+    def always_times_out(*_args: object) -> dict[str, object]:
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(run_demo, "_request", always_times_out)
+    monkeypatch.setattr(run_demo.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(run_demo.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(TimeoutError, match="initial hybrid retrieval"):
+        run_demo._await_initial_context()
+
+
+def test_await_initial_context_surfaces_http_errors_immediately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A real API answer (401, 500) is not warm-up; hiding it would mask auth or policy bugs.
+    denied = urllib.error.HTTPError("http://localhost:8080", 401, "Unauthorized", Message(), None)
+
+    def rejects(*_args: object) -> dict[str, object]:
+        raise denied
+
+    monkeypatch.setattr(run_demo, "_request", rejects)
+    monkeypatch.setattr(run_demo.time, "monotonic", lambda: 0.0)
+
+    with pytest.raises(urllib.error.HTTPError):
+        run_demo._await_initial_context()
