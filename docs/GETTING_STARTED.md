@@ -11,7 +11,7 @@ here was run on macOS (Apple silicon) from a fresh clone on 2026-09-25; times ar
 | Python | 3.13 exactly (`>=3.13,<3.14`) | You do not need to install it. `uv` downloads 3.13 on first sync if your system Python is different. |
 | `make` | any | Preinstalled on macOS and most Linux systems. Every target is a thin wrapper around `uv run poe <task>`. |
 | Node.js + npm | Node 22 or later | Only for the browser test (`make ui`). |
-| Docker with Compose v2 | recent | Only for the full local stack (`make up`). |
+| Docker with Compose v2 | recent, with at least 4 GiB of memory | Only for the full local stack (`make up`). Redpanda reserves 768 MiB and OpenSearch about 1 GiB; give Docker Desktop 4 GiB under Settings > Resources. `make up` refuses a smaller Docker VM; `ACS_SKIP_MEMORY_CHECK=1 make up` skips that check. |
 | [Dagger](https://docs.dagger.io/) | 0.21.8 | Optional. Only to run the exact CI container locally. |
 
 Local traps we actually hit:
@@ -19,13 +19,9 @@ Local traps we actually hit:
 - **Plain `uv sync` is not enough for the full check.** It skips the optional `agent` extra, and
   one unit test then fails with `ModuleNotFoundError: No module named 'pydantic_ai'`. Use
   `make bootstrap` (which runs `uv sync --all-extras --all-groups`).
-- **A `.env` file in the repo root breaks one test.** Settings are read from `.env`, so
-  `test_factory_refuses_unconfigured_bearer_authentication` sees `ACS_DEMO_TOKEN` and fails with
-  `DID NOT RAISE ValueError`, and coverage then drops just under 90%. Run `make verify` without a
-  `.env` (rename it while you check), and only create one when you run the Docker stack.
-- **Only one copy of the Docker stack can run at a time.** The Compose project is named after the
-  folder and binds fixed ports (8080, 5432, 9200, 19092 and others). If another checkout's stack is
-  up, stop it first with `make down` in that checkout.
+- **Only one copy of the Docker stack can run at a time.** The Compose project is always named
+  `agentic-context-service` and binds fixed ports (8080, 5432, 9200, 19092 and others). If another
+  checkout's stack is up, stop it first with `make down` in that checkout.
 
 ## 2. Clone, install, and run it
 

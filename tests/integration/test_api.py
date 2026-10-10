@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from types import SimpleNamespace
 from typing import Any
@@ -15,6 +15,7 @@ import pytest
 
 from agentic_context_service.adapters.observability import emit_retrieval_audit
 from agentic_context_service.adapters.service import PolicyDeniedError
+from agentic_context_service.api import models as api_models
 from agentic_context_service.api.app import create_app
 from agentic_context_service.api.request_context import (
     AuthenticatedPrincipal,
@@ -444,6 +445,81 @@ async def test_validation_errors_use_the_public_stable_error_contract() -> None:
         "request_id": "req-1",
         "retryable": False,
     }
+
+
+async def _create_memory(expires_at: object) -> tuple[httpx.Response, RecordingService]:
+    secret = b"a sufficiently long test signing secret"
+    service = RecordingService()
+    app = create_app(service=service, signing_secret=secret, authenticator=_authenticator())
+    body = {
+        "namespace": {
+            "environment": "test",
+            "workflow_id": "place-order",
+            "workflow_revision": "1",
+            "session_id": "session-1",
+        },
+        "memory_type": "working",
+        "text": "remember",
+        "expires_at": expires_at,
+    }
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/v1/memories", headers=_signed_headers(secret), json=body)
+    return response, service
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "expires_at",
+    [
+        "2026-09-20T00:00:00Z",
+        (datetime.now(UTC) - timedelta(seconds=1)).isoformat(),
+        "2999-01-01T00:00:00",
+    ],
+    ids=["past", "just-expired", "no-timezone"],
+)
+async def test_memory_create_rejects_an_expiry_that_is_not_a_future_instant(
+    expires_at: str,
+) -> None:
+    # An already-expired memory was stored as "created" and then never searchable.
+    response, service = await _create_memory(expires_at)
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_REQUEST"
+    assert service.calls == []
+
+
+@pytest.mark.asyncio
+async def test_memory_create_rejects_an_expiry_of_exactly_now(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime(2030, 1, 1, tzinfo=UTC)
+    monkeypatch.setattr(api_models, "_utc_now", lambda: now)
+
+    at_now, _ = await _create_memory(now.isoformat())
+    just_after, _ = await _create_memory((now + timedelta(microseconds=1)).isoformat())
+
+    assert at_now.status_code == 400
+    assert just_after.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_memory_create_rejects_a_non_string_expiry() -> None:
+    # The contract says string/date-time; lax parsing would accept a bare epoch number.
+    response, service = await _create_memory(4_102_444_800)
+
+    assert response.status_code == 400
+    assert service.calls == []
+
+
+@pytest.mark.asyncio
+async def test_memory_create_accepts_a_future_expiry() -> None:
+    expires_at = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+
+    response, service = await _create_memory(expires_at)
+
+    assert response.status_code == 201
+    assert [operation for operation, _payload in service.calls] == ["memory.create"]
 
 
 @pytest.mark.asyncio

@@ -93,6 +93,8 @@ services:
       CONFIG_STORAGE_REPLICATION_FACTOR: "1"
       OFFSET_STORAGE_REPLICATION_FACTOR: "1"
       STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      # Kafka Connect defaults to -Xmx2G, which got Debezium OOM-killed in small Docker VMs.
+      HEAP_OPTS: -Xms256M -Xmx512M
     ports: ["8083:8083"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -171,8 +173,7 @@ services:
     restart: "no"
 
   opa:
-    image: openpolicyagent/opa:1.8.0
-    platform: linux/amd64
+    image: openpolicyagent/opa:1.8.0-static@sha256:3c350b0f3130e71000c43c859e1479d8bb9c693442e7e5180e59026b61c068a1
     command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies"]
     ports: ["8181:8181"]
     volumes:

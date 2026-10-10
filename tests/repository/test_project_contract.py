@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 import json
 import re
+import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -171,3 +173,126 @@ def test_ci_modules_pinned_to_reviewed_commit() -> None:
     for dep in ci_deps.values():
         assert dep["source"].endswith(f"@{CI_MODULE_PIN}"), dep
         assert dep["pin"] == CI_MODULE_PIN, dep
+
+
+def _compose_services() -> dict[str, dict[str, object]]:
+    compose = yaml.safe_load((ROOT / "deploy/compose/docker-compose.yml").read_text())
+    services: dict[str, dict[str, object]] = compose["services"]
+    return services
+
+
+def test_local_stack_runs_natively_on_every_host_architecture() -> None:
+    # A platform pin forces emulation on Apple silicon; amd64 OPA segfaults there.
+    pinned = sorted(name for name, svc in _compose_services().items() if "platform" in svc)
+
+    assert not pinned, f"services pinned to one platform: {pinned}"
+
+
+def test_local_opa_uses_the_multi_arch_static_image() -> None:
+    # Only OPA's "-static" tags publish linux/arm64; the plain tag is amd64-only. The digest is
+    # the multi-arch index (linux/amd64 + linux/arm64), so the pin keeps both architectures.
+    opa = _compose_services()["opa"]
+
+    assert opa["image"] == (
+        "openpolicyagent/opa:1.8.0-static"
+        "@sha256:3c350b0f3130e71000c43c859e1479d8bb9c693442e7e5180e59026b61c068a1"
+    )
+
+
+def test_local_opa_healthcheck_execs_the_opa_binary_without_a_shell() -> None:
+    healthcheck = _compose_services()["opa"]["healthcheck"]
+    assert isinstance(healthcheck, dict)
+
+    assert healthcheck["test"][:2] == ["CMD", "/opa"]
+
+
+def test_local_stack_images_avoid_the_retired_personal_mirror() -> None:
+    images = [str(svc["image"]) for svc in _compose_services().values() if "image" in svc]
+
+    assert images
+    assert not [image for image in images if "hseshadr" in image]
+
+
+def test_make_targets_ignore_a_foreign_active_virtualenv() -> None:
+    # uv warns when VIRTUAL_ENV points at another project's venv; make must not inherit it.
+    makefile_lines = (ROOT / "Makefile").read_text().splitlines()
+
+    assert "unexport VIRTUAL_ENV" in makefile_lines
+
+
+def _create_memory_field(*path: str) -> object:
+    node: object = yaml.safe_load((ROOT / "packages/contracts/openapi.yaml").read_text())
+    for key in ("paths", "/v1/memories", "post", *path):
+        assert isinstance(node, dict), f"openapi createMemory has no {key!r}"
+        node = node[key]
+    return node
+
+
+def test_openapi_create_memory_example_is_accepted_by_the_api() -> None:
+    # The API rejects a past expiry, so a dated example must stay in the future.
+    content = ("requestBody", "content", "application/json", "example", "expires_at")
+    expires_at = datetime.fromisoformat(str(_create_memory_field(*content)))
+
+    assert expires_at > datetime.now(UTC)
+
+
+def test_openapi_documents_the_past_expiry_rejection() -> None:
+    description = _create_memory_field("responses", "400", "description")
+
+    assert "expires_at" in str(description)
+
+
+def test_docs_no_longer_warn_that_a_dotenv_breaks_the_suite() -> None:
+    # tests/conftest.py isolates Settings from .env; the old workaround text is now false.
+    stale = ("without a `.env`", "breaks one test", "rename it while you check")
+    docs = {path: (ROOT / path).read_text() for path in ("README.md", "docs/GETTING_STARTED.md")}
+
+    found = [(path, phrase) for path, text in docs.items() for phrase in stale if phrase in text]
+    assert not found, f"stale .env workaround text: {found}"
+
+
+def test_docs_state_the_docker_memory_the_local_stack_needs() -> None:
+    requirements = {
+        "README.md": "You need Docker with Compose v2, at least 4 GiB of memory for Docker",
+        "docs/GETTING_STARTED.md": (
+            "| Docker with Compose v2 | recent, with at least 4 GiB of memory |"
+        ),
+    }
+    for path, sentence in requirements.items():
+        text = " ".join((ROOT / path).read_text().split())
+        assert sentence in text, f"{path} omits the Docker memory requirement"
+        assert "ACS_SKIP_MEMORY_CHECK=1" in text, f"{path} omits the preflight override"
+
+
+# Each JVM image and the environment variable its entrypoint reads JVM heap flags from.
+_JVM_HEAP_VARIABLES = {
+    "quay.io/debezium/connect": "HEAP_OPTS",
+    "opensearchproject/opensearch": "OPENSEARCH_JAVA_OPTS",
+}
+
+
+def test_every_jvm_service_caps_its_heap() -> None:
+    # Debezium's Kafka Connect default is -Xmx2G, which OOM-killed it in a 2.8 GiB Docker VM.
+    jvm_services = {
+        name: (svc, variable)
+        for name, svc in _compose_services().items()
+        for image, variable in _JVM_HEAP_VARIABLES.items()
+        if str(svc.get("image", "")).startswith(image)
+    }
+    uncapped = []
+    for name, (svc, variable) in jvm_services.items():
+        environment = svc.get("environment")
+        assert isinstance(environment, dict)
+        if "-Xmx" not in str(environment.get(variable, "")):
+            uncapped.append(name)
+
+    assert set(jvm_services) == {"debezium", "opensearch"}
+    assert not uncapped, f"JVM services without an explicit -Xmx: {uncapped}"
+
+
+def test_make_up_runs_the_docker_memory_preflight_before_compose() -> None:
+    tasks = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["poe"]["tasks"]
+
+    assert tasks["up"] == ["docker-memory-check", "compose-up"]
+    assert tasks["docker-memory-check"] == "python -m scripts.check_docker_memory"
+    assert tasks["compose-up"].startswith("docker compose -f deploy/compose/docker-compose.yml up")

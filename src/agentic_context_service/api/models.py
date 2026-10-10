@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _MAX_FILTER_VALUES = 100
 _ALLOWED_FILTERS = {
@@ -90,12 +90,32 @@ class SourceEvidence(APIModel):
     uri: str | None = Field(default=None, max_length=2_048)
 
 
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 class MemoryCreateRequest(APIModel):
     namespace: MemoryNamespace
     memory_type: str = Field(min_length=1, max_length=128)
     text: str = Field(min_length=1, max_length=50_000)
     source_evidence: tuple[SourceEvidence, ...] = Field(default=(), max_length=100)
-    expires_at: datetime | None = None
+    expires_at: AwareDatetime | None = None
+
+    @field_validator("expires_at", mode="before")
+    @classmethod
+    def require_iso_string(cls, value: object) -> object:
+        # The contract is string/date-time; lax parsing would also take a bare epoch number.
+        if value is not None and not isinstance(value, str):
+            raise ValueError("expires_at must be an ISO 8601 string")
+        return value
+
+    @field_validator("expires_at")
+    @classmethod
+    def require_future_expiry(cls, value: AwareDatetime | None) -> AwareDatetime | None:
+        # Search hides expired memories, so storing one would report "created" for nothing.
+        if value is not None and value <= _utc_now():
+            raise ValueError("expires_at must be in the future")
+        return value
 
 
 class MemorySearchRequest(APIModel):

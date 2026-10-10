@@ -9,6 +9,7 @@ import subprocess  # nosec B404
 import time
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 
@@ -20,6 +21,7 @@ API = "http://localhost:8080"
 DEMO_SUBJECT = "demo-analyst"
 TARGET_RECORD_ID = "NORTHSTAR-104"
 MEMORY_TEXT = "Prefer margin deltas as percentages."
+MEMORY_TTL = timedelta(days=1)
 HEADERS = {
     "Authorization": "Bearer demo-retail-token",
     "Content-Type": "application/json",
@@ -159,11 +161,21 @@ def _has_initial_context(response: dict[str, object]) -> bool:
 def _await_initial_context() -> dict[str, object]:
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
-        response = _request("/v1/context:retrieve", _retrieval())
-        if _has_initial_context(response):
+        response = _try_initial_retrieval()
+        if response is not None and _has_initial_context(response):
             return response
         time.sleep(1)
     raise TimeoutError("initial hybrid retrieval lacked cited, ranked fresh context")
+
+
+def _try_initial_retrieval() -> dict[str, object] | None:
+    # A fresh API is unreachable or loads its embedding model during the first queries.
+    try:
+        return _request("/v1/context:retrieve", _retrieval())
+    except urllib.error.HTTPError:
+        raise
+    except (TimeoutError, urllib.error.URLError):
+        return None
 
 
 def _valid_initial_result(result: object) -> bool:
@@ -271,7 +283,7 @@ def _memory() -> dict[str, object]:
             "memory_type": "working",
             "text": MEMORY_TEXT,
             "source_evidence": [],
-            "expires_at": "2026-09-20T00:00:00Z",
+            "expires_at": (datetime.now(UTC) + MEMORY_TTL).isoformat(),
         },
     )
 
