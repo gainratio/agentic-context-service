@@ -288,8 +288,10 @@ def test_await_initial_context_surfaces_http_errors_immediately(
     def rejects(*_args: object) -> dict[str, object]:
         raise denied
 
+    clock = iter([0.0, 0.0, 61.0])
     monkeypatch.setattr(run_demo, "_request", rejects)
-    monkeypatch.setattr(run_demo.time, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(run_demo.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(run_demo.time, "sleep", lambda _seconds: None)
 
     with pytest.raises(urllib.error.HTTPError):
         run_demo._await_initial_context()
