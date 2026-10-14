@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import json
+import re
 from pathlib import Path
 from typing import cast
 
@@ -10,8 +12,13 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / ".dagger/src/agentic_context_service_ci/main.py"
 WORKFLOWS = ROOT / ".github/workflows"
-CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
-DAGGER_ACTION = "dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77"
+# Owners stay allowlisted; the SHA values do not. Dependabot moves the SHAs, and the
+# property that matters is that every ref is an immutable 40-hex commit with a `# vX` comment.
+CHECKOUT = "actions/checkout"
+DAGGER_ACTION = "dagger/dagger-for-github"
+PINNED_USES = re.compile(r"^\s*- uses: (?P<action>[\w.-]+/[\w.-]+)@(?P<ref>\S+)(?P<comment>.*)$")
+SHA_REF = re.compile(r"^[0-9a-f]{40}$")
+VERSION_COMMENT = re.compile(r"^ # v\d+(\.\d+)*$")
 EXPECTED_INGRESS = {
     "dagger.yml": "ci",
     "dagger-security.yml": "security",
@@ -102,6 +109,19 @@ def _workflow_steps(name: str, source: str | None = None) -> list[dict[str, obje
     return cast(list[dict[str, object]], job["steps"])
 
 
+def _engine_version() -> str:
+    document = cast(dict[str, str], json.loads((ROOT / "dagger.json").read_text()))
+    return document["engineVersion"].removeprefix("v")
+
+
+def _assert_immutable_action_pins(source: str) -> None:
+    lines = [match for line in source.splitlines() if (match := PINNED_USES.match(line))]
+    assert lines, "workflow has no `uses:` steps"
+    for match in lines:
+        assert SHA_REF.match(match["ref"]), f"{match['action']} is not pinned to a commit SHA"
+        assert VERSION_COMMENT.match(match["comment"]), f"{match['action']} lacks a # vX comment"
+
+
 def _function_body(name: str) -> str:
     functions = [
         node
@@ -113,19 +133,21 @@ def _function_body(name: str) -> str:
 
 
 def _assert_thin_workflow(name: str, source: str | None = None) -> None:
-    steps = _workflow_steps(name, source)
+    text = (WORKFLOWS / name).read_text() if source is None else source
+    _assert_immutable_action_pins(text)
+    steps = _workflow_steps(name, text)
     assert len(steps) == 2, "workflow must remain checkout followed by one Dagger call"
     checkout, dagger = steps
-    assert checkout["uses"] == CHECKOUT
+    assert str(checkout["uses"]).startswith(f"{CHECKOUT}@")
     assert checkout["with"] == {
         "fetch-depth": 0,
         "ref": "${{ github.sha }}",
         "persist-credentials": False,
     }
-    assert dagger["uses"] == DAGGER_ACTION
+    assert str(dagger["uses"]).startswith(f"{DAGGER_ACTION}@")
     assert "run" not in checkout and "run" not in dagger
     assert dagger.get("with") == {
-        "version": "0.21.8",
+        "version": _engine_version(),
         "verb": "call",
         "args": (
             f"{EXPECTED_INGRESS[name]} --commit-sha=${{{{ github.sha }}}}"
@@ -215,7 +237,39 @@ def test_contract_rejects_a_workflow_that_drops_the_run_identity() -> None:
 
 
 def test_contract_rejects_a_non_dagger_workflow() -> None:
-    workflow = (WORKFLOWS / "ui.yml").read_text().replace(DAGGER_ACTION, CHECKOUT, 1)
+    workflow = (WORKFLOWS / "ui.yml").read_text().replace(f"{DAGGER_ACTION}@", f"{CHECKOUT}@", 1)
     assert workflow != (WORKFLOWS / "ui.yml").read_text()
     with pytest.raises(AssertionError):
         _assert_thin_workflow("ui.yml", workflow)
+
+
+def _repoint(replacement: str) -> str:
+    original = (WORKFLOWS / "dagger.yml").read_text()
+    workflow = re.sub(rf"{CHECKOUT}@[0-9a-f]{{40}} # v[\d.]+", replacement, original, count=1)
+    assert workflow != original
+    return workflow
+
+
+@pytest.mark.parametrize(
+    ("replacement", "reason"),
+    [
+        (f"{CHECKOUT}@v7", "not pinned to a commit SHA"),
+        (f"{CHECKOUT}@main # v7.0.1", "not pinned to a commit SHA"),
+        (f"{CHECKOUT}@{'a' * 40}", "lacks a # vX comment"),
+    ],
+)
+def test_contract_rejects_a_mutable_or_unlabelled_action_ref(replacement: str, reason: str) -> None:
+    with pytest.raises(AssertionError, match=reason):
+        _assert_thin_workflow("dagger.yml", _repoint(replacement))
+
+
+def test_contract_accepts_a_dependabot_sha_bump() -> None:
+    _assert_thin_workflow("dagger.yml", _repoint(f"{CHECKOUT}@{'d' * 40} # v7.2.0"))
+
+
+def test_contract_rejects_a_dagger_cli_that_drifts_from_the_engine() -> None:
+    original = (WORKFLOWS / "dagger.yml").read_text()
+    workflow = original.replace(f'version: "{_engine_version()}"', 'version: "0.0.1"', 1)
+    assert workflow != original
+    with pytest.raises(AssertionError):
+        _assert_thin_workflow("dagger.yml", workflow)
