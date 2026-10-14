@@ -7,6 +7,7 @@ import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).parents[2]
@@ -175,6 +176,9 @@ def test_ci_modules_pinned_to_reviewed_commit() -> None:
         assert dep["pin"] == CI_MODULE_PIN, dep
 
 
+MULTI_ARCH_OPA = re.compile(r"openpolicyagent/opa:\d+\.\d+\.\d+-static@sha256:[0-9a-f]{64}")
+
+
 def _compose_services() -> dict[str, dict[str, object]]:
     compose = yaml.safe_load((ROOT / "deploy/compose/docker-compose.yml").read_text())
     services: dict[str, dict[str, object]] = compose["services"]
@@ -191,12 +195,20 @@ def test_local_stack_runs_natively_on_every_host_architecture() -> None:
 def test_local_opa_uses_the_multi_arch_static_image() -> None:
     # Only OPA's "-static" tags publish linux/arm64; the plain tag is amd64-only. The digest is
     # the multi-arch index (linux/amd64 + linux/arm64), so the pin keeps both architectures.
-    opa = _compose_services()["opa"]
+    # Assert the property, not a copy of the digest, so a Dependabot bump cannot trip it.
+    assert MULTI_ARCH_OPA.fullmatch(str(_compose_services()["opa"]["image"]))
 
-    assert opa["image"] == (
-        "openpolicyagent/opa:1.8.0-static"
-        "@sha256:3c350b0f3130e71000c43c859e1479d8bb9c693442e7e5180e59026b61c068a1"
-    )
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        "openpolicyagent/opa:1.8.0@sha256:" + "a" * 64,
+        "openpolicyagent/opa:1.8.0-static",
+        "openpolicyagent/opa:latest-static@sha256:" + "a" * 64,
+    ],
+)
+def test_opa_image_property_rejects_amd64_only_or_unpinned_tags(image: str) -> None:
+    assert not MULTI_ARCH_OPA.fullmatch(image)
 
 
 def test_local_opa_healthcheck_execs_the_opa_binary_without_a_shell() -> None:

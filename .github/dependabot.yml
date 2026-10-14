@@ -1,23 +1,36 @@
 version: 2
+# Monthly, minor+patch grouped per ecosystem, 7-day cooldown. Semver-major updates are
+# ignored here on purpose: majors are migrated by hand in a human-written PR.
 updates:
   # uv, not pip: the pip ecosystem widened pyproject ranges without relocking
   # uv.lock, so bumps were never installed or tested under `uv sync --frozen`.
   - package-ecosystem: uv
     directory: /
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
+    cooldown: {default-days: 7}
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       python-dependencies: {patterns: ["*"], update-types: ["minor", "patch"]}
   - package-ecosystem: github-actions
     directory: /
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
+    cooldown: {default-days: 7}
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       actions: {patterns: ["*"], update-types: ["minor", "patch"]}
   - package-ecosystem: docker
     directory: /deploy/containers
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
+    cooldown: {default-days: 7}
     # requires-python is >=3.13,<3.14, so the runtime image stays on 3.13.x:
     # take patch releases, never a new Python minor or major.
     ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
       - dependency-name: python
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
