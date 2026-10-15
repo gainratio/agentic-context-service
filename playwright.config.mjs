@@ -15,12 +15,23 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: process.env.PLAYWRIGHT_BASE_URL
-    ? undefined
-    : {
-        command: "uv run python -m scripts.serve_showcase",
-        reuseExistingServer: !process.env.CI,
-        timeout: 30_000,
-        url: `${baseURL}/health/live`,
-      },
+  webServer: [
+    ...(process.env.PLAYWRIGHT_BASE_URL
+      ? []
+      : [
+          {
+            command: "uv run python -m scripts.serve_showcase",
+            reuseExistingServer: !process.env.CI,
+            timeout: 30_000,
+            url: `${baseURL}/health/live`,
+          },
+        ]),
+    // The offline demo that `make demo` opens, on its own port.
+    {
+      command: "uv run python -m agentic_context_service.demo --no-browser --port 8091",
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+      url: "http://127.0.0.1:8091/health/live",
+    },
+  ],
 });

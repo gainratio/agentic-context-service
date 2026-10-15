@@ -52,6 +52,7 @@ Issues = "https://github.com/gainratio/agentic-context-service/issues"
 
 [project.scripts]
 agentic-context = "agentic_context_service.cli:entrypoint"
+acs-demo = "agentic_context_service.demo.cli:entrypoint"
 
 [dependency-groups]
 dev = [
@@ -137,6 +138,7 @@ docker-memory-check = "python -m scripts.check_docker_memory"
 compose-up = "docker compose -f deploy/compose/docker-compose.yml up -d --wait"
 up = ["docker-memory-check", "compose-up"]
 seed = "python -m scripts.seed_demo"
-demo = "python -m scripts.run_demo"
+demo = "python -m agentic_context_service.demo"
+stack-demo = "python -m scripts.run_demo"
 down = "docker compose -f deploy/compose/docker-compose.yml down"
 clean = "python -m scripts.clean"

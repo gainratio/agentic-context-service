@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="Ask a question as one of a retailer's AI assistants and see which records the Agentic Context Service lets it read, with sources.">
+    <title>Agentic Context Service demo</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#ask">Skip to the question form</a>
+    <header class="masthead">
+      <p class="eyebrow">Agentic Context Service</p>
+      <h1>Ask as an assistant. See only what it may know.</h1>
+      <p class="lede">Demo Retail runs two AI assistants, one for its pricing team and one for customer support. Another company uses the same service. Pick an assistant, ask a question, and watch the service decide which records it gets back, each with its source.</p>
+      <aside class="mode" role="note" aria-labelledby="mode-title">
+        <span class="mode-mark" aria-hidden="true">i</span>
+        <div>
+          <h2 id="mode-title" data-mode-title>Offline demo</h2>
+          <p data-mode-summary>Everything runs on this computer.</p>
+        </div>
+      </aside>
+    </header>
+
+    <main>
+      <section aria-labelledby="examples-title" class="examples">
+        <h2 id="examples-title">Try an example</h2>
+        <div class="example-list" data-examples></div>
+        <p class="expect" data-expect aria-live="polite" hidden></p>
+      </section>
+
+      <div class="columns">
+        <section aria-labelledby="ask-title" class="panel" id="ask">
+          <h2 id="ask-title"><span class="step">1</span> The question</h2>
+          <form data-ask-form>
+            <label for="assistant">Assistant</label>
+            <select id="assistant" name="assistant" data-assistant></select>
+            <p class="hint" data-assistant-hint></p>
+            <label for="question">Question</label>
+            <input id="question" name="question" maxlength="500" required autocomplete="off" value="What is the discount limit for NS-100?">
+            <fieldset>
+              <legend>Collections to search</legend>
+              <div class="corpora" data-corpora></div>
+            </fieldset>
+            <button type="submit" data-ask-button>Ask</button>
+          </form>
+          <h3>What the assistant sends</h3>
+          <p class="hint">Your API gateway adds the identity headers and signs them. The service rejects any request whose signature does not match.</p>
+          <pre class="code" data-request tabindex="0" aria-label="HTTP request">Press Ask to see the request.</pre>
+        </section>
+
+        <section aria-labelledby="answer-title" class="panel">
+          <h2 id="answer-title"><span class="step">2</span> The answer</h2>
+          <p class="status" data-status aria-live="polite">No question asked yet.</p>
+          <ol class="results" data-results></ol>
+          <details>
+            <summary>Raw JSON response</summary>
+            <pre class="code" data-response tabindex="0" aria-label="HTTP response"></pre>
+          </details>
+        </section>
+      </div>
+
+      <section aria-labelledby="store-title" class="panel store">
+        <h2 id="store-title"><span class="step">3</span> Everything in the store</h2>
+        <p class="hint">All seven records the service holds. The last column shows what happened to each one for the question above.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-labelledby="store-title">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Record</th>
+                <th scope="col">Company</th>
+                <th scope="col">Collection</th>
+                <th scope="col">Who may read it</th>
+                <th scope="col">Class</th>
+                <th scope="col">For this question</th>
+              </tr>
+            </thead>
+            <tbody data-records></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <footer class="footer">
+      <p>Synthetic data. Source: <code>src/agentic_context_service/demo/</code>. The full stack (PostgreSQL change capture, OpenSearch, Open Policy Agent) runs in Docker with <code>make up</code>.</p>
+    </footer>
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

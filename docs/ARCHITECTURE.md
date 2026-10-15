@@ -136,6 +136,19 @@ results and never contacts OpenSearch), production capacity or SLOs, or the beha
 model provider. The README quickstart uses the in-memory store, whose semantic search is a
 deterministic stand-in, so it runs in exact-match (lexical) mode.
 
+## The offline demo
+
+`make demo` starts the real FastAPI app (`agentic_context_service.demo`) on
+http://127.0.0.1:8090 and opens its page in your browser. It swaps exactly two dependencies:
+OpenSearch becomes `testing.search_store.InMemorySearchStore`, which reuses the OpenSearch
+adapter's own visibility check and ranks by shared words, and the OPA server becomes
+`testing.policy.StaticPolicy`, which reads OPA's own data file
+([`policies/context/data.json`](../policies/context/data.json)) and applies the rules in
+`authz.rego`; `tests/unit/test_static_policy.py` replays the Rego test cases against it. The
+routes, signature check, and `GovernedContextService` are the production code. The page talks to
+a small built-in gateway route (`POST /demo/api/ask`) that signs each request with a demo-only
+key and forwards it to `POST /v1/context:retrieve`, then shows both the request and the response.
+
 ## The local showcase
 
 ```bash
@@ -143,7 +156,7 @@ cp .env.example .env
 make bootstrap
 make up
 make seed
-make demo
+make stack-demo
 ```
 
 The deterministic `demo-retail` story (the demo brand is called `NORTHSTAR`) shows:
@@ -155,7 +168,7 @@ The deterministic `demo-retail` story (the demo brand is called `NORTHSTAR`) sho
 5. session memory retrieved later as non-authoritative context;
 6. trace, metrics, audit, and evaluation evidence.
 
-`make demo` exits nonzero if an expectation is not met. Stop the stack without deleting named
+`make stack-demo` exits nonzero if an expectation is not met. Stop the stack without deleting named
 volumes with `make down`. See [operations](operations.md) for health checks and playbooks.
 
 The dashboard at `http://localhost:8080/showcase/` is an observation surface; see the

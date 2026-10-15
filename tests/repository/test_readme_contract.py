@@ -18,6 +18,7 @@ MAX_TAGLINE = 120
 MAX_BADGES = 3
 SECTIONS = (
     "## Try it",
+    "## Use it in your own code",
     "## How it works",
     "## What it does not do",
     "## When to use something else",
@@ -38,6 +39,7 @@ MORE_DETAIL_LINKS = (
     "docs/adr/",
     "packages/contracts/openapi.yaml",
     "examples/",
+    "src/agentic_context_service/demo/",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "CHANGELOG.md",
@@ -95,7 +97,8 @@ def test_title_and_first_line_match_the_package_description() -> None:
 def test_fastest_way_to_try_it_is_bold_and_right_under_the_first_line() -> None:
     lines = [line for line in README.splitlines()[1:] if line.strip()]
     assert lines[1].startswith("**"), "the second line must be the bold try-it line"
-    assert "examples/quickstart/governed_retrieval.py" in lines[1]
+    assert "`make demo`" in lines[1]
+    assert "browser" in lines[1]
 
 
 def test_intro_is_short_and_has_few_badges() -> None:
@@ -126,6 +129,18 @@ def test_try_it_output_is_the_real_output(capsys: pytest.CaptureFixture[str]) ->
     actual = capsys.readouterr().out
     assert actual in _fenced_text_blocks(), "the Try it output must equal a real run"
     assert "uv run python examples/quickstart/governed_retrieval.py" in _section("## Try it")
+
+
+def test_demo_screenshot_sits_in_the_intro_and_exists() -> None:
+    assert "](docs/assets/demo.png)" in _intro()
+    assert (ROOT / "docs/assets/demo.png").is_file()
+
+
+def test_try_it_starts_the_browser_demo_and_names_its_mode() -> None:
+    try_it = _section("## Try it")
+    assert "make demo" in try_it
+    assert "offline demo" in try_it
+    assert "http://127.0.0.1:8090/demo/" in try_it
 
 
 def test_status_is_honest_about_the_untagged_pre_release() -> None:
