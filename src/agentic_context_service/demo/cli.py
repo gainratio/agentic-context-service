@@ -23,18 +23,26 @@ _log = logging.getLogger("agentic_context_service.demo")
 
 
 class BrowserOpeningServer(uvicorn.Server):
-    """A uvicorn server that opens the demo page once it is accepting connections."""
+    """A uvicorn server that opens the demo page once it is accepting connections.
 
-    def __init__(self, config: uvicorn.Config, url: str, opener: Callable[[str], object]) -> None:
+    `opener` returns False when no browser is available (a server or a container);
+    the page address is then printed for the reader to open. None skips the browser.
+    """
+
+    def __init__(
+        self, config: uvicorn.Config, url: str, opener: Callable[[str], bool] | None
+    ) -> None:
         super().__init__(config)
         self._url = url
         self._opener = opener
 
     async def startup(self, sockets: list[socket.socket] | None = None) -> None:
         await super().startup(sockets)
-        if not self.should_exit:
-            _log.info("Demo running at %s (press Ctrl+C to stop)", self._url)
-            self._opener(self._url)
+        if self.should_exit:
+            return
+        _log.info("Demo running at %s (press Ctrl+C to stop)", self._url)
+        if self._opener is not None and not self._opener(self._url):
+            _log.warning("No browser could be opened here. Open %s in a browser.", self._url)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +78,7 @@ def main(argv: Sequence[str]) -> None:
     _require_free_port(options.host, options.port)
     app = create_demo_app(options.policy_data)
     config = uvicorn.Config(app, host=options.host, port=options.port)
-    opener = webbrowser.open if options.open_browser else _skip_browser
+    opener = webbrowser.open if options.open_browser else None
     BrowserOpeningServer(config, options.url, opener).run()
 
 
@@ -86,10 +94,6 @@ def _require_free_port(host: str, port: int) -> None:
             f"Port {port} is already in use. Stop the other demo, "
             f"or run `uv run acs-demo --port {port + 5}`."
         ) from error
-
-
-def _skip_browser(url: str) -> None:
-    del url
 
 
 def entrypoint() -> None:
