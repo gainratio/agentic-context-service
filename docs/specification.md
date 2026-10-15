@@ -320,7 +320,7 @@ IDs/versions, ranking version, and latency.
 nDCG@K, MRR, citation completeness, unauthorized count, freshness, p50/p95, and versions. It fails
 on any unauthorized result, incomplete citations, or checked-in threshold regression.
 
-**AC-19 — Ten-minute story.** Clean `make up && make seed && make demo` runs all eight steps without
+**AC-19 — Ten-minute story.** Clean `make up && make seed && make stack-demo` runs all eight steps without
 manual configuration, prints human-readable citations/freshness/denial/memory trust, and only exits
 zero when expectations pass.
 

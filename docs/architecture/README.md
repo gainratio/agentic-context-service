@@ -54,7 +54,7 @@ telemetry are adapters composed at process entrypoints. FastAPI is transport onl
 A signed request receives an OPA decision, constrained lexical/vector candidates, deterministic
 fusion, token/freshness budgeting, citations, a safe audit record, a connected trace, and
 Prometheus measurements. `reports/evaluation.*` records offline fixture evidence; container-backed
-tests and `make demo` are required for live CDC claims.
+tests and `make stack-demo` are required for live CDC claims.
 
 ## Showcase boundary
 

@@ -6,7 +6,7 @@
 make bootstrap
 make up
 make seed
-make demo
+make stack-demo
 make eval
 make down
 ```
