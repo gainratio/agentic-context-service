@@ -24,8 +24,8 @@ passage names its source record, version, and age. You run it on your own machin
 ## Try it
 
 You need `git`, `make`, and [uv](https://docs.astral.sh/uv/). uv installs Python 3.13 for you
-if needed. uv's install script needs `curl`; on a bare Linux image also install
-`ca-certificates`, or `git clone` and the uv download fail.
+if needed. uv's install script needs `curl`. On a bare Linux image also install
+`ca-certificates`; without it, `git clone` and the uv download fail.
 
 ```bash
 git clone https://github.com/gainratio/agentic-context-service.git
