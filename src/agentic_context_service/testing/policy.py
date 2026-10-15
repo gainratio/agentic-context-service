@@ -12,7 +12,7 @@ from typing import Any, Final
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from agentic_context_service.adapters.opa import PolicyDecision
+from agentic_context_service.adapters.opa import PolicyDecision, PolicyUnavailableError
 
 _ENVIRONMENTS: Final = frozenset({"development", "test", "staging", "production"})
 _RESULT_LIMIT: Final = 12
@@ -88,7 +88,9 @@ class StaticPolicy:
             parsed = _PolicyInput.model_validate(policy_input)
         except ValidationError as error:
             raise PolicyInputError("policy input does not match the OPA contract") from error
-        return self._decide(parsed, allow=self._allows(parsed))
+        allow = self._allows(parsed)
+        self._require_defined(parsed, allow=allow)
+        return self._decide(parsed, allow=allow)
 
     async def ready(self) -> bool:
         """The tables are loaded in memory, so the policy is always ready."""
@@ -104,6 +106,14 @@ class StaticPolicy:
                 self._source_allowed(given.request),
             )
         )
+
+    def _require_defined(self, given: _PolicyInput, *, allow: bool) -> None:
+        """Rego leaves `decision` undefined for an allowed purpose with no collections table
+        entry and no named collections; OPAClient then fails closed. Do the same."""
+        request = given.request
+        has_table = request.purpose in self._tables.corpora_by_purpose
+        if allow and not has_table and not request.corpora:
+            raise PolicyUnavailableError("OPA returns no decision for this purpose")
 
     def _source_allowed(self, request: _Request) -> bool:
         if request.operation != _FRESHNESS:

@@ -19,7 +19,7 @@ passage names its source record, version, and age. You run it on your own machin
 
 **Technical docs:** [Architecture](docs/ARCHITECTURE.md) · [Getting started for developers](docs/GETTING_STARTED.md) · [API contract](packages/contracts/openapi.yaml) · [Threat model](docs/threat-model/README.md)
 
-![The demo page after the pricing assistant asks "What is the discount limit for NS-100?": the 20% pricing rule comes back first with its source record, version 7 and age, followed by the product record and the approved promotion](docs/assets/demo.png)
+![The demo page after the pricing assistant asks "What is the discount limit for NS-100?": four plain steps show the question, what the service did (checked the signature, blocked 4 of 7 records), the 3 facts sent back with their sources, and why it matters](docs/assets/demo.png)
 
 ## Try it
 
@@ -35,31 +35,37 @@ make demo
 The first run downloads Python and the packages, which takes a minute or two. Then your browser
 opens http://127.0.0.1:8090/demo/. Press Ctrl+C in the terminal to stop it.
 
-The page is a made-up shoe retailer, Demo Retail. It has seven records (pricing rules, a
-product, a return policy, an approved promotion, a finance note, a board plan) and two AI
-assistants: one for the pricing team and one for customer support. A second company, Other
-Retailer, uses the same service. Click the example buttons:
+The page tells a short story. Demo Retail is a made-up shoe shop with two AI assistants: one
+helps its pricing team, one answers customers at the help desk. A second shop, Other Retailer,
+uses the same service. Between them the service holds seven records: pricing rules, a product
+fact, a return policy, an approved sale, a finance note, and a board plan. Pick a scenario:
 
-1. **Pricing assistant asks the discount limit.** The 20% rule comes back first, with where it
-   came from: record `NS-100` in the catalog database, version 7, two hours old. The finance
-   note and the board plan stay hidden.
-2. **Support chatbot asks the same question.** It does not get the internal 20% rule. It gets
-   the approved 15% promotion, which support is allowed to quote.
-3. **Another company asks the same question.** It gets only its own 50% rule.
-4. **Support chatbot tries to read pricing records.** Refused with `403 POLICY_DENIED`. A caller
-   can narrow what it searches, never widen it.
+1. **The pricing assistant asks for a discount limit.** The 20% rule comes back first, with where
+   it came from: record `NS-100` in the catalog database, version 7, two hours old. The finance
+   note and the board plan are set aside.
+2. **The customer help assistant asks the same thing.** It does not get the internal 20% rule. It
+   gets the approved 15% sale, which the help desk may quote.
+3. **Another shop's assistant asks the same thing.** It gets only its own shop's rule.
+4. **The customer help assistant asks about returns.** It gets the return policy, which only the
+   help desk may read.
+5. **The customer help assistant tries to open pricing rules.** Refused with `403
+   POLICY_DENIED`. Asking for more than its job allows never gets it more.
 
-For each question the page shows the exact HTTP request the assistant sent, the answer, and a
-table of all seven records with what happened to each one and why.
+For each one the page shows, in plain words, the question, what the service did, what the
+assistant got back, why it matters, and what happened to each of the seven records. A
+"For developers" panel shows the exact HTTP request and response and lets you ask your own
+question.
 
 The page says which mode it runs in. `make demo` is the **offline demo**: the HTTP API, the
 signature check, and the access rules are the real service code, but records live in memory and
 are matched by words, and the access rules from
 [`policies/context/data.json`](policies/context/data.json) are applied by a small built-in
-stand-in for Open Policy Agent. Nothing leaves your computer. The full stack below swaps in
+stand-in for Open Policy Agent. CI checks that the stand-in gives the same answers as the real
+Open Policy Agent. Nothing leaves your computer. The full stack below swaps in
 OpenSearch, live database changes, and the real Open Policy Agent.
 
-Prefer the terminal? This prints the same check without a browser or a server:
+Prefer the terminal? This prints a smaller version of the same check, run in-process with no
+browser and no server:
 
 ```bash
 uv run python examples/quickstart/governed_retrieval.py
@@ -76,8 +82,9 @@ customer-support asks "What is the discount limit for NS-100?" -> 0 result(s)
 ## Use it in your own code
 
 Your assistant calls the service over HTTP: one `POST /v1/context:retrieve` per question. Any
-language works. In Python you need an HTTP client and, for local testing, this package's request
-signer:
+language works (the signature recipe is below). In Python you need an HTTP client and, for local
+testing, this package's request signer. The package is the whole server, about 50 dependencies,
+so in production you may prefer to compute the signature yourself:
 
 ```bash
 pip install httpx "agentic-context-service @ git+https://github.com/gainratio/agentic-context-service"
@@ -177,15 +184,23 @@ What to know when you wire it into a real assistant:
 - **The headers say who is asking and for which job.** The bearer token identifies the
   assistant. The service decides what it may see from the token and the `purpose`, never from
   anything else the caller claims.
-- **The signature normally comes from your API gateway.** The service checks an HMAC-SHA256
-  signature over those headers and refuses requests older than five minutes. In production your
-  gateway holds the key, so assistants never see it. The demo key above is only for the demo.
+- **The signature normally comes from your API gateway.** In production your gateway holds the
+  key, so assistants never see it. The demo key above is only for the demo. In any language:
+  take these 11 headers in this order, `authorization`, `x-team-id`, `x-app-id`,
+  `x-workflow-id`, `x-workflow-revision`, `x-agent-id`, `x-environment`, `x-cost-center`,
+  `x-request-id`, `x-trace-id`, `x-acs-timestamp`; write each as `name:value` (lowercase name,
+  trimmed value); join them with `\n`; and send the hex HMAC-SHA256 of that text as
+  `X-ACS-Signature`. The timestamp is Unix seconds. The service refuses a signature older than
+  five minutes or more than 30 seconds in the future.
 - **Each result carries its evidence.** `citation` names the source system, record, and version;
   `freshness` gives its age; `trust_class` says how much to trust it. Put these in the
   assistant's prompt so its answer can cite them.
-- **Refusals are explicit.** `401` means the identity or signature failed, `403 POLICY_DENIED`
-  means the assistant asked for something its job does not allow, and `409 CONTEXT_STALE` means
-  you set `stale_behavior: "fail"` and a match was older than your `max_age_seconds`.
+- **Refusals are explicit.** Every error body is
+  `{"code": ..., "message": ..., "request_id": ..., "retryable": ...}`. `400 INVALID_REQUEST`
+  means the body did not match the contract, `401 UNAUTHENTICATED` means the identity or
+  signature failed, `403 POLICY_DENIED` means the assistant asked for something its job does not
+  allow, and `409 CONTEXT_STALE` means you set `stale_behavior: "fail"` and a match was older
+  than your `max_age_seconds`.
 
 The [API contract](packages/contracts/openapi.yaml) lists every route and field, and the
 [architecture guide](docs/ARCHITECTURE.md#api-shape) explains them. The service can also store
@@ -209,6 +224,11 @@ returns the top passages with their sources and ages.
   it from this repository.
 - **It is not a chat app or a framework for building assistants.** It is the lookup your
   assistant calls.
+- **It knows one assistant out of the box.** The full stack accepts a single token
+  (`ACS_DEMO_TOKEN`). To give each of your assistants its own identity, plug in your own token
+  check by implementing `BearerAuthenticator` in
+  [`api/request_context.py`](src/agentic_context_service/api/request_context.py), for example
+  one that validates your identity provider's tokens.
 - **It is not the source of truth.** Your databases are. The index is updated a moment after the
   database changes, not in the same transaction.
 - **The local stack is for trying it, not for production.** It turns off TLS, private
@@ -259,7 +279,7 @@ make verify
 ```
 
 `make verify` runs the same checks as CI: lint, strict type checks, tests with at least 90%
-coverage, security scans, and a retrieval-quality evaluation. It takes about a minute. The tests
+coverage, security scans, and a retrieval-quality evaluation. It takes about 20 seconds. The tests
 ignore any `.env` file, so it is safe to run after the quickstart above. `make ui` runs the
 browser tests for the demo page and the dashboard.
 [Getting started for developers](docs/GETTING_STARTED.md) covers prerequisites, a map of the

@@ -83,7 +83,7 @@ class Example:
     assistant: str
     question: str
     corpora: tuple[str, ...]
-    expect: str
+    why: str
 
 
 def _source(system: str, resource: str, record: Record) -> dict[str, str]:
@@ -115,11 +115,11 @@ ASSISTANTS: Final = (
         "pricing-assistant-token", "pricing", "price-check", PRICING, PRICING_CORPORA,
     ),
     Assistant(
-        "support-bot", "Customer support chatbot", "Demo Retail", DEMO_RETAIL,
+        "support-bot", "Customer help assistant", "Demo Retail", DEMO_RETAIL,
         "support-bot-token", "support", "customer-chat", SUPPORT, SUPPORT_CORPORA,
     ),
     Assistant(
-        "other-company-pricing", "Other Retailer's pricing assistant", "Other Retailer",
+        "other-company-pricing", "Pricing assistant", "Other Retailer",
         OTHER_RETAILER, "other-retailer-token", "pricing", "price-check", PRICING,
         PRICING_CORPORA,
     ),
@@ -164,7 +164,7 @@ RECORDS: Final = (
         "restricted", ("restricted-data",), "postgres://board/plans/PLAN-7", "1", 1 * _DAY,
     ),
     Record(
-        "NS-100-other", OTHER_RETAILER, "pricing", "NS-100 discount limit",
+        "NS-100-other", OTHER_RETAILER, "pricing", "NS-100 clearance discount limit",
         "NS-100 discount limit at Other Retailer: up to 50% off during clearance.",
         "internal", (PRICING,), "postgres://catalog/pricing_rules/NS-100-other", "12", 6 * _HOUR,
     ),
@@ -172,29 +172,53 @@ RECORDS: Final = (
 
 EXAMPLES: Final = (
     Example(
-        "Pricing assistant asks the discount limit", "pricing-assistant",
+        "The pricing assistant asks for a discount limit", "pricing-assistant",
         "What is the discount limit for NS-100?", PRICING_CORPORA,
-        "The 20% rule comes back first, with its source record, version and age. The finance "
-        "note and the board plan stay hidden.",
+        "Without a check like this, a pricing assistant wired straight into the databases could "
+        "also read the finance team's margin note and the board's plan. Here it gets only what "
+        "the pricing team may use, and each fact says where it came from.",
     ),
     Example(
-        "Support chatbot asks the same question", "support-bot",
+        "The customer help assistant asks the same thing", "support-bot",
         "What is the discount limit for NS-100?", SUPPORT_CORPORA,
-        "No internal 20% rule. It gets the approved 15% promotion, which support may quote.",
+        "The help desk can tell a customer about the 15% sale, but it never sees the internal 20% "
+        "limit that customers must not hear about.",
     ),
     Example(
-        "Another company asks the same question", "other-company-pricing",
+        "Another shop's assistant asks the same thing", "other-company-pricing",
         "What is the discount limit for NS-100?", PRICING_CORPORA,
-        "Only Other Retailer's own 50% rule. Demo Retail's records never appear.",
+        "Two shops share one service, and neither can ever see the other's prices.",
     ),
     Example(
-        "Support chatbot asks about returns", "support-bot",
+        "The customer help assistant asks about returns", "support-bot",
         "Can a customer return worn NS-100 shoes?", SUPPORT_CORPORA,
-        "The return policy, which only support is cleared to read.",
+        "Only the help desk is cleared to read the return policy, and it gets it with its source "
+        "and age.",
     ),
     Example(
-        "Support chatbot tries to read pricing records", "support-bot",
+        "The customer help assistant tries to open pricing rules", "support-bot",
         "What is the discount limit for NS-100?", ("pricing",),
-        "Refused with 403 POLICY_DENIED. A caller can narrow what it searches, never widen it.",
+        "Asking for more than its job allows does not get it more. The service refuses outright "
+        "instead of handing over a partial answer.",
     ),
 )  # fmt: skip
+
+# Plain-language names the page shows instead of internal identifiers.
+JOB_LABELS: Final = {
+    PRICING: "the pricing team",
+    SUPPORT: "the help desk",
+    "finance-review": "the finance team",
+    "restricted-data": "the board",
+}
+GROUP_LABELS: Final = {
+    "pricing": "pricing rules",
+    "product": "product facts",
+    "support": "help-desk policies",
+    "approved-decisions": "approved decisions",
+}
+SENSITIVITY_LABELS: Final = {
+    "public": "public",
+    "internal": "staff only",
+    "confidential": "confidential",
+    "restricted": "restricted",
+}

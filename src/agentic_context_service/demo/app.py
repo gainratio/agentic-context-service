@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
@@ -22,17 +22,22 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
+from agentic_context_service.adapters.opa import PolicyDecision
 from agentic_context_service.adapters.service import GovernedContextService
 from agentic_context_service.api.app import create_app
 from agentic_context_service.api.request_context import (
     RequestContextSigner,
     StaticTokenAuthenticator,
 )
+from agentic_context_service.demo.explain import explain
 from agentic_context_service.demo.scenario import (
     ASSISTANTS,
     DEMO_SIGNING_KEY,
     EXAMPLES,
+    GROUP_LABELS,
+    JOB_LABELS,
     RECORDS,
+    SENSITIVITY_LABELS,
     Assistant,
 )
 from agentic_context_service.testing.policy import StaticPolicy
@@ -44,10 +49,15 @@ _MODE: Final = {
     "name": "offline",
     "title": "Offline demo",
     "summary": (
-        "Everything runs on this computer. No API key, no network, no Docker. Records live in "
-        "memory and are matched by words, not meaning. Access rules come from "
-        "policies/context/data.json, applied by a built-in stand-in for Open Policy Agent. "
-        "The HTTP API, signature check and policy enforcement are the real service code."
+        "Runs only on your computer, with a made-up shop and made-up records. Nothing is sent "
+        "anywhere, and no account or key is needed."
+    ),
+    "details": (
+        "Offline mode. The web service, the signature check and the access rules are the real "
+        "service code. Two parts are simplified so it runs without Docker: records live in "
+        "memory and are matched by shared words, not by meaning, and the access rules in "
+        "policies/context/data.json are applied by a built-in stand-in for Open Policy Agent. "
+        "The full stack described in the README uses OpenSearch and the real Open Policy Agent."
     ),
 }
 
@@ -65,8 +75,9 @@ class AskRequest(BaseModel):
 def create_demo_app(policy_data: Path, *, now: datetime | None = None) -> FastAPI:
     """Build the offline service with Demo Retail's records and assistants loaded."""
     moment = now or datetime.now(UTC)
+    policy = StaticPolicy.from_file(policy_data)
     service = GovernedContextService(
-        opa=StaticPolicy.from_file(policy_data),
+        opa=policy,
         store=InMemorySearchStore(record.indexed(moment) for record in RECORDS),
         embedding_model="none (offline word match)",
     )
@@ -76,32 +87,109 @@ def create_demo_app(policy_data: Path, *, now: datetime | None = None) -> FastAP
         signing_secret=DEMO_SIGNING_KEY,
         authenticator=StaticTokenAuthenticator(tokens),
     )
-    _register_demo_routes(app, moment)
+    _register_demo_routes(app, _Demo(policy, moment))
     return app
 
 
-def _register_demo_routes(app: FastAPI, moment: datetime) -> None:
+@dataclass(frozen=True, slots=True)
+class _Demo:
+    policy: StaticPolicy
+    moment: datetime
+
+    def documents(self) -> list[dict[str, Any]]:
+        return [record.indexed(self.moment) for record in RECORDS]
+
+
+def _register_demo_routes(app: FastAPI, demo: _Demo) -> None:
     @app.get("/", include_in_schema=False)
     async def home() -> RedirectResponse:
         return RedirectResponse("/demo/")
 
     @app.get("/demo/api/scenario", include_in_schema=False)
     async def scenario() -> dict[str, Any]:
-        return _scenario(moment)
+        return _scenario(demo)
 
     @app.post("/demo/api/ask", include_in_schema=False)
     async def ask(body: AskRequest) -> dict[str, Any]:
-        return await _ask_through_gateway(app, _assistant(body.assistant), body)
+        assistant = _assistant(body.assistant)
+        exchange = await _ask_through_gateway(app, assistant, body)
+        return {**exchange, **await _explanation(demo, assistant, body, exchange)}
 
     app.mount("/demo", StaticFiles(directory=_STATIC, html=True), name="demo")
 
 
-def _scenario(moment: datetime) -> dict[str, Any]:
+def _scenario(demo: _Demo) -> dict[str, Any]:
     return {
         "mode": _MODE,
-        "assistants": [asdict(assistant) for assistant in ASSISTANTS],
-        "records": [_record_view(record.indexed(moment)) for record in RECORDS],
+        "assistants": [_assistant_view(assistant) for assistant in ASSISTANTS],
+        "records": [_record_view(document) for document in demo.documents()],
         "examples": [asdict(example) for example in EXAMPLES],
+    }
+
+
+def _assistant_view(assistant: Assistant) -> dict[str, Any]:
+    return {
+        **asdict(assistant),
+        "job": JOB_LABELS[assistant.purpose],
+        "groups": [GROUP_LABELS[corpus] for corpus in assistant.corpora],
+    }
+
+
+async def _explanation(
+    demo: _Demo, assistant: Assistant, body: AskRequest, exchange: dict[str, Any]
+) -> dict[str, Any]:
+    response = exchange["response"]
+    decision = await _decision(demo, assistant, body, response)
+    outcomes = explain(demo.documents(), decision, assistant, _returned_ids(response))
+    groups = decision.allowed_corpora if decision else ()
+    return {
+        "allowed_groups": [GROUP_LABELS.get(group, group) for group in groups],
+        "outcomes": [asdict(outcome) for outcome in outcomes],
+    }
+
+
+async def _decision(
+    demo: _Demo, assistant: Assistant, body: AskRequest, response: dict[str, Any]
+) -> PolicyDecision | None:
+    """The policy decision behind an answered request; None when the service refused it."""
+    if response["status"] != status.HTTP_200_OK:
+        return None
+    return await demo.policy.authorize(_policy_question(assistant, body))
+
+
+def _returned_ids(response: dict[str, Any]) -> frozenset[str]:
+    results = response["body"].get("results", [])
+    return frozenset(str(result["citation"]["record_id"]) for result in results)
+
+
+def _policy_question(assistant: Assistant, body: AskRequest) -> dict[str, Any]:
+    """The same question the service sends to the policy for this request."""
+    principal = assistant.principal()
+    return {
+        "identity": {
+            "subject": principal.subject,
+            "tenant_id": principal.tenant_id,
+            "teams": list(principal.teams),
+            "entitlements": list(principal.entitlements),
+        },
+        "workload": {
+            "team_id": assistant.team,
+            "app_id": assistant.id,
+            "workflow_id": assistant.workflow,
+            "workflow_revision": "v1",
+            "agent_id": assistant.id,
+            "environment": "development",
+            "cost_center": "retail",
+            "headers_verified": True,
+        },
+        "request": {
+            "operation": "retrieve",
+            "purpose": assistant.purpose,
+            "corpora": list(body.corpora),
+            "classifications": [],
+            "namespace": None,
+            "source": None,
+        },
     }
 
 
@@ -111,10 +199,13 @@ def _record_view(document: dict[str, Any]) -> dict[str, Any]:
         "record_id": document["document_id"],
         "tenant_id": document["tenant_id"],
         "corpus": document["domain"],
+        "group": GROUP_LABELS[document["domain"]],
         "title": document["title"],
         "text": document["content"],
         "classification": governance["classification"],
+        "sensitivity": SENSITIVITY_LABELS[governance["classification"]],
         "purposes": governance["allowed_purposes"],
+        "readers": [JOB_LABELS[purpose] for purpose in governance["allowed_purposes"]],
         "uri": document["source"]["uri"],
         "version": document["source"]["version"],
         "updated_at": document["validity"]["source_updated_at"],

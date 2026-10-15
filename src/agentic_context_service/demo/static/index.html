@@ -4,86 +4,86 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
-    <meta name="description" content="Ask a question as one of a retailer's AI assistants and see which records the Agentic Context Service lets it read, with sources.">
+    <meta name="description" content="See how the Agentic Context Service gives each AI assistant only the records its job allows, with the source of every fact.">
     <title>Agentic Context Service demo</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <a class="skip-link" href="#ask">Skip to the question form</a>
+    <a class="skip-link" href="#scenarios">Skip to the scenarios</a>
     <header class="masthead">
-      <p class="eyebrow">Agentic Context Service</p>
-      <h1>Ask as an assistant. See only what it may know.</h1>
-      <p class="lede">Demo Retail runs two AI assistants, one for its pricing team and one for customer support. Another company uses the same service. Pick an assistant, ask a question, and watch the service decide which records it gets back, each with its source.</p>
+      <p class="eyebrow">Agentic Context Service · demo</p>
+      <h1>Each AI assistant sees only what its job allows.</h1>
+      <p class="lede">Companies let AI assistants read their records so they can answer questions. This service sits in between: it hands each assistant only the records it is allowed to see, and says where every fact came from and how old it is.</p>
       <aside class="mode" role="note" aria-labelledby="mode-title">
-        <span class="mode-mark" aria-hidden="true">i</span>
-        <div>
-          <h2 id="mode-title" data-mode-title>Offline demo</h2>
-          <p data-mode-summary>Everything runs on this computer.</p>
-        </div>
+        <h2 id="mode-title" data-mode-title>Offline demo</h2>
+        <p data-mode-summary>Runs only on your computer.</p>
       </aside>
     </header>
 
     <main>
-      <section aria-labelledby="examples-title" class="examples">
-        <h2 id="examples-title">Try an example</h2>
+      <section class="story" aria-labelledby="story-title" id="scenarios">
+        <h2 id="story-title">The story</h2>
+        <p>Demo Retail is a shoe shop that sells a trail shoe called NS-100. It has two AI assistants: one helps its <strong>pricing team</strong>, one answers customers at the <strong>help desk</strong>. A second shop, Other Retailer, uses the same service. Between them, the service holds 7 records: entries from the shops' databases, such as a price rule or a product description.</p>
+        <p class="pick">Pick a scenario. It plays out step by step below.</p>
         <div class="example-list" data-examples></div>
-        <p class="expect" data-expect aria-live="polite" hidden></p>
       </section>
 
-      <div class="columns">
-        <section aria-labelledby="ask-title" class="panel" id="ask">
-          <h2 id="ask-title"><span class="step">1</span> The question</h2>
-          <form data-ask-form>
-            <label for="assistant">Assistant</label>
-            <select id="assistant" name="assistant" data-assistant></select>
-            <p class="hint" data-assistant-hint></p>
-            <label for="question">Question</label>
-            <input id="question" name="question" maxlength="500" required autocomplete="off" value="What is the discount limit for NS-100?">
-            <fieldset>
-              <legend>Collections to search</legend>
-              <div class="corpora" data-corpora></div>
-            </fieldset>
-            <button type="submit" data-ask-button>Ask</button>
-          </form>
-          <h3>What the assistant sends</h3>
-          <p class="hint">Your API gateway adds the identity headers and signs them. The service rejects any request whose signature does not match.</p>
-          <pre class="code" data-request tabindex="0" aria-label="HTTP request">Press Ask to see the request.</pre>
-        </section>
+      <section class="run" aria-live="polite" data-run hidden>
+        <article class="step" data-step="question">
+          <h2><span class="num">1</span> The question</h2>
+          <p class="label">Who is asking</p>
+          <p class="value" data-who></p>
+          <p class="label">What they ask</p>
+          <p class="value question" data-question></p>
+        </article>
 
-        <section aria-labelledby="answer-title" class="panel">
-          <h2 id="answer-title"><span class="step">2</span> The answer</h2>
-          <p class="status" data-status aria-live="polite">No question asked yet.</p>
+        <article class="step" data-step="service">
+          <h2><span class="num">2</span> What the service did</h2>
+          <ol class="captions" data-captions></ol>
+        </article>
+
+        <article class="step" data-step="answer">
+          <h2><span class="num">3</span> What the assistant gets back</h2>
+          <p class="status" data-status></p>
           <ol class="results" data-results></ol>
-          <details>
-            <summary>Raw JSON response</summary>
-            <pre class="code" data-response tabindex="0" aria-label="HTTP response"></pre>
-          </details>
-        </section>
-      </div>
+        </article>
 
-      <section aria-labelledby="store-title" class="panel store">
-        <h2 id="store-title"><span class="step">3</span> Everything in the store</h2>
-        <p class="hint">All seven records the service holds. The last column shows what happened to each one for the question above.</p>
-        <div class="table-wrap" tabindex="0" role="region" aria-labelledby="store-title">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Record</th>
-                <th scope="col">Company</th>
-                <th scope="col">Collection</th>
-                <th scope="col">Who may read it</th>
-                <th scope="col">Class</th>
-                <th scope="col">For this question</th>
-              </tr>
-            </thead>
-            <tbody data-records></tbody>
-          </table>
-        </div>
+        <article class="step summary" data-step="summary">
+          <h2><span class="num">4</span> Why it matters</h2>
+          <p data-why></p>
+          <p class="tally" data-tally></p>
+        </article>
+
+        <details class="step records" data-step="records">
+          <summary>See all 7 records and what happened to each</summary>
+          <ul class="record-list" data-records></ul>
+        </details>
       </section>
+
+      <details class="developer">
+        <summary>For developers: what is real here, the exact request, and your own question</summary>
+        <p class="hint" data-mode-details></p>
+        <form data-ask-form>
+          <label for="assistant">Assistant</label>
+          <select id="assistant" name="assistant" data-assistant></select>
+          <label for="question">Question</label>
+          <input id="question" name="question" maxlength="500" required autocomplete="off" value="What is the discount limit for NS-100?">
+          <fieldset>
+            <legend>Record groups to search (the API calls these <code>corpora</code>)</legend>
+            <div class="corpora" data-corpora></div>
+          </fieldset>
+          <button type="submit" data-ask-button>Ask</button>
+        </form>
+        <h3>The HTTP request the assistant sent</h3>
+        <p class="hint">An API gateway adds these identity headers and signs them. The service rejects any request whose signature does not match.</p>
+        <pre class="code" data-request tabindex="0" aria-label="HTTP request">Pick a scenario to see the request.</pre>
+        <h3>The JSON the service answered with</h3>
+        <pre class="code" data-response tabindex="0" aria-label="HTTP response"></pre>
+      </details>
     </main>
     <footer class="footer">
-      <p>Synthetic data. Source: <code>src/agentic_context_service/demo/</code>. The full stack (PostgreSQL change capture, OpenSearch, Open Policy Agent) runs in Docker with <code>make up</code>.</p>
+      <p>Made-up data. Code: <code>src/agentic_context_service/demo/</code>. The README explains how to run the full version with real databases.</p>
     </footer>
     <script src="app.js" type="module"></script>
   </body>

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from agentic_context_service.adapters.opa import PolicyDecision
+from agentic_context_service.adapters.opa import PolicyDecision, PolicyUnavailableError
 from agentic_context_service.testing.policy import PolicyInputError, StaticPolicy
 
 POLICY_DATA = Path(__file__).parents[2] / "policies/context/data.json"
@@ -194,3 +194,33 @@ async def test_should_refuse_input_when_it_does_not_match_the_policy_contract() 
 async def test_should_report_ready_when_tables_are_loaded() -> None:
     # Given / When / Then
     assert await StaticPolicy.from_file(POLICY_DATA).ready()
+
+
+@pytest.mark.asyncio
+async def test_should_give_no_decision_when_purpose_has_no_collections_and_none_are_named() -> None:
+    # Given: restricted-data is an entitlement with no corpora_by_purpose entry. Rego leaves
+    # `decision` undefined here, so the real OPA client fails closed.
+    policy_input = _input(
+        identity={"entitlements": ["restricted-data"]},
+        request={"purpose": "restricted-data", "corpora": []},
+    )
+
+    # When / Then
+    with pytest.raises(PolicyUnavailableError):
+        await _decide(policy_input)
+
+
+@pytest.mark.asyncio
+async def test_should_grant_no_collections_when_purpose_has_none_but_some_are_named() -> None:
+    # Given
+    policy_input = _input(
+        identity={"entitlements": ["restricted-data"]},
+        request={"purpose": "restricted-data", "corpora": ["pricing"]},
+    )
+
+    # When
+    decision = await _decide(policy_input)
+
+    # Then
+    assert decision.allow
+    assert decision.allowed_corpora == ()

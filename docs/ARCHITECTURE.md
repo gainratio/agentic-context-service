@@ -144,7 +144,10 @@ OpenSearch becomes `testing.search_store.InMemorySearchStore`, which reuses the 
 adapter's own visibility check and ranks by shared words, and the OPA server becomes
 `testing.policy.StaticPolicy`, which reads OPA's own data file
 ([`policies/context/data.json`](../policies/context/data.json)) and applies the rules in
-`authz.rego`; `tests/unit/test_static_policy.py` replays the Rego test cases against it. The
+`authz.rego`; `tests/unit/test_static_policy.py` replays the Rego test cases against it, and
+the Dagger gate starts the pinned OPA image and checks that both give the same answer on 11,520
+generated inputs (`tests/integration/test_policy_parity.py`). The same gate runs
+`opa test policies/`. The
 routes, signature check, and `GovernedContextService` are the production code. The page talks to
 a small built-in gateway route (`POST /demo/api/ask`) that signs each request with a demo-only
 key and forwards it to `POST /v1/context:retrieve`, then shows both the request and the response.

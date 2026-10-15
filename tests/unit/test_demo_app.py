@@ -168,3 +168,31 @@ async def test_should_reject_unsigned_calls_when_they_skip_the_gateway(
 
     # Then
     assert response.status_code in {400, 401}
+
+
+@pytest.mark.asyncio
+async def test_should_explain_every_record_when_the_pricing_assistant_asks(
+    client: httpx.AsyncClient,
+) -> None:
+    # Given / When
+    payload = await _ask(client, "pricing-assistant", PRICING)
+
+    # Then
+    outcomes = {o["record_id"]: o["status"] for o in payload["outcomes"]}  # type: ignore[attr-defined]
+    assert outcomes["NS-100"] == "returned"
+    assert outcomes["NS-100-margin"] == "set_aside"
+    assert outcomes["NS-100-other"] == "set_aside"
+    assert payload["allowed_groups"] == ["pricing rules", "product facts", "approved decisions"]
+
+
+@pytest.mark.asyncio
+async def test_should_mark_nothing_searched_when_the_request_is_refused(
+    client: httpx.AsyncClient,
+) -> None:
+    # Given / When
+    payload = await _ask(client, "support-bot", ["pricing"])
+
+    # Then
+    statuses = {o["status"] for o in payload["outcomes"]}  # type: ignore[attr-defined]
+    assert statuses == {"not_searched"}
+    assert payload["allowed_groups"] == []

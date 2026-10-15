@@ -21,6 +21,11 @@ NODE_IMAGE: Final = (
     "node:24.16.0-bookworm-slim@sha256:"
     "2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203"
 )
+OPA_IMAGE: Final = (
+    "openpolicyagent/opa:1.8.0-static@sha256:"
+    "3c350b0f3130e71000c43c859e1479d8bb9c693442e7e5180e59026b61c068a1"
+)
+OPA_PARITY_TEST: Final = "tests/integration/test_policy_parity.py"
 SOURCE_ROOT: Final = "/src"
 LOCK_INPUTS: Final = ("pyproject.toml", "uv.lock")
 NODE_LOCK_INPUTS: Final = ("package.json", "package-lock.json")
@@ -142,6 +147,34 @@ def _security_evidence(source: dagger.Directory) -> dagger.Container:
     )
 
 
+def _opa(source: dagger.Directory) -> dagger.Container:
+    return (
+        dag.container().from_(OPA_IMAGE).with_directory("/policies", source.directory("policies"))
+    )
+
+
+def _rego_tests(source: dagger.Directory) -> dagger.Container:
+    """Run policies/context/authz_test.rego with the same OPA build the stack uses."""
+    return _opa(source).with_exec(["/opa", "test", "/policies", "-v"])
+
+
+def _policy_parity(source: dagger.Directory) -> dagger.Container:
+    """Prove the offline StaticPolicy answers exactly like a real OPA server."""
+    server = (
+        _opa(source)
+        .with_exposed_port(8181)
+        .as_service(args=["/opa", "run", "--server", "--addr=0.0.0.0:8181", "/policies"])
+    )
+    return (
+        _project(source)
+        .with_service_binding("opa", server)
+        .with_env_variable("ACS_OPA_PARITY_URL", "http://opa:8181")
+        .with_exec(
+            ["uv", "run", "pytest", OPA_PARITY_TEST, "-m", "integration", "--force-enable-socket"]
+        )
+    )
+
+
 def _showcase(source: dagger.Directory) -> dagger.Container:
     """Run the repository's real Playwright Chromium showcase path."""
     node = dag.container().from_(NODE_IMAGE).directory("/usr/local")
@@ -179,6 +212,8 @@ class AgenticContextService:
             ["uv", "run", "python", "-m", "scripts.validate_contracts"]
         )
         await proof.with_exec(["uv", "run", "poe", "verify"]).sync()
+        await _rego_tests(verified).sync()
+        await _policy_parity(verified).sync()
         return "Agentic Context Service canonical Dagger gate passed"
 
     @function

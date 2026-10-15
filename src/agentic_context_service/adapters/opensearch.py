@@ -538,7 +538,7 @@ class OpenSearchContextStore:
         results: list[SearchHit] = []
         for hit in response.get("hits", {}).get("hits", []):
             source = hit.get("_source", {})
-            if not _is_permitted(source, request):
+            if not is_permitted(source, request):
                 continue
             results.append(
                 SearchHit(
@@ -695,7 +695,8 @@ def _is_version_conflict(error: Exception) -> bool:
     )
 
 
-def _is_permitted(source: dict[str, Any], request: SearchRequest) -> bool:
+def is_permitted(source: dict[str, Any], request: SearchRequest) -> bool:
+    """Whether a stored document may be shown for this request (tenant, liveness, scope)."""
     if source.get("tenant_id") != request.tenant_id or not _is_live(source):
         return False
     if request.corpora == ("memory",):

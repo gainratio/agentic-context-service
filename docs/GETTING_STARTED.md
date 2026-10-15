@@ -71,14 +71,15 @@ make verify
 CI runs this same task (`uv run poe verify`) inside a Dagger container. It runs, in order:
 formatting and lint (Ruff), strict type checks (mypy), a complexity limit (xenon, grade A),
 unit and contract tests with at least 90% line and branch coverage, integration tests (one of
-them starts the demo command on a real port), BDD scenarios, security scans (Bandit and
+them starts the demo command on a real port; the OPA comparison is skipped locally and runs in
+CI), BDD scenarios, security scans (Bandit and
 pip-audit), and the offline retrieval evaluation.
 
-It took 18 seconds. The test lines in a passing run look like this:
+It took 13 to 18 seconds. The test lines in a passing run look like this:
 
 ```text
-====================== 311 passed, 4 deselected in 4.72s =======================
-================= 1 passed, 1 skipped, 55 deselected in 0.95s ==================
+====================== 321 passed, 5 deselected in 3.07s =======================
+================= 1 passed, 2 skipped, 55 deselected in 1.25s ==================
 ============================== 2 passed in 0.65s ===============================
 Evaluation PASS: 3 queries -> .../reports/evaluation.json
 ```
@@ -93,7 +94,7 @@ make ui
 ```
 
 `make ui-install` took 1 second with Chromium already downloaded, and `make ui` took 3 seconds,
-ending in `4 passed`.
+ending in `5 passed`.
 
 ## 4. Map of the code
 
@@ -145,7 +146,8 @@ page shows, update `tests/e2e/demo.spec.mjs` and run `make ui`.
 - **Branch names** follow the commit type: `feat/...`, `fix/...`, `docs/...`, `ci/...`,
   `chore/...`. Commit messages use the same prefixes (`fix: require deep agent tool calls ...`).
 - **CI checks** on every pull request: `Dagger` (it checks the exact commit, runs
-  `python -m scripts.validate_contracts`, then `make verify` in a container), `Chromium showcase
+  `python -m scripts.validate_contracts`, then `make verify` in a container, then `opa test
+  policies/` and a check that the offline policy stand-in answers exactly like a real OPA server), `Chromium showcase
   proof` (the `make ui` browser tests), `Security evidence` (an SBOM and Bandit), and
   `GitGuardian Security Checks` (secret scanning).
 - **Reviewers look for** a test that failed before the change, no drop below 90% coverage, thin

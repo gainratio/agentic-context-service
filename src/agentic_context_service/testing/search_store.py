@@ -17,7 +17,7 @@ from agentic_context_service.adapters.opensearch import (
     SearchRequest,
     TombstoneRequest,
     UpsertRequest,
-    _is_permitted,
+    is_permitted,
 )
 
 _WORD: Final = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
@@ -49,7 +49,7 @@ class InMemorySearchStore:
         return [(score, doc) for score, doc in scored if score > 0]
 
     def _permitted(self, request: SearchRequest) -> list[dict[str, Any]]:
-        return [doc for doc in self._documents if _is_permitted(doc, request)]
+        return [doc for doc in self._documents if is_permitted(doc, request)]
 
     async def get(self, *, tenant_id: str, document_id: str) -> dict[str, Any] | None:
         """This store holds no assistant memories."""
