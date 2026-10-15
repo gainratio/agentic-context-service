@@ -24,7 +24,8 @@ passage names its source record, version, and age. You run it on your own machin
 ## Try it
 
 You need `git`, `make`, and [uv](https://docs.astral.sh/uv/). uv installs Python 3.13 for you
-if needed.
+if needed. uv's install script needs `curl`; on a bare Linux image also install
+`ca-certificates`, or `git clone` and the uv download fail.
 
 ```bash
 git clone https://github.com/gainratio/agentic-context-service.git
@@ -32,8 +33,10 @@ cd agentic-context-service
 make demo
 ```
 
-The first run downloads Python and the packages, which takes a minute or two. Then your browser
-opens http://127.0.0.1:8090/demo/. Press Ctrl+C in the terminal to stop it.
+The first run downloads Python and about 110 packages (roughly 200 MB). On a fast connection that
+takes seconds; allow a minute or two on a slow one. Then your browser opens
+http://127.0.0.1:8090/demo/. On a machine with no browser, such as a server or a container, it
+prints that address for you to open instead. Press Ctrl+C in the terminal to stop it.
 
 The page tells a short story. Demo Retail is a made-up shoe shop with two AI assistants: one
 helps its pricing team, one answers customers at the help desk. A second shop, Other Retailer,
