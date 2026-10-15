@@ -20,9 +20,13 @@ async def _no_sockets(self: uvicorn.Server, sockets: object = None) -> None:
     del self, sockets
 
 
-def _server(opened: list[str]) -> cli.BrowserOpeningServer:
+def _server(opened: list[str], *, browser_found: bool = True) -> cli.BrowserOpeningServer:
+    def opener(url: str) -> bool:
+        opened.append(url)
+        return browser_found
+
     config = uvicorn.Config(lambda: None, port=0)
-    return cli.BrowserOpeningServer(config, "http://x/demo/", opened.append)
+    return cli.BrowserOpeningServer(config, "http://x/demo/", opener)
 
 
 def test_should_use_the_documented_address_when_no_flags_are_given() -> None:
@@ -57,6 +61,52 @@ async def test_should_open_the_page_when_the_server_has_started(
 
     # Then
     assert opened == ["http://x/demo/"]
+
+
+@pytest.mark.asyncio
+async def test_should_print_the_address_to_open_when_no_browser_can_be_opened(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Given a machine with no browser, such as a server or a container
+    monkeypatch.setattr(uvicorn.Server, "startup", _no_sockets)
+    caplog.set_level("INFO", logger="agentic_context_service.demo")
+
+    # When
+    await _server([], browser_found=False).startup()
+
+    # Then
+    assert "No browser could be opened here. Open http://x/demo/ in a browser." in caplog.messages
+
+
+@pytest.mark.asyncio
+async def test_should_not_print_the_fallback_when_the_browser_opened(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Given
+    monkeypatch.setattr(uvicorn.Server, "startup", _no_sockets)
+    caplog.set_level("INFO", logger="agentic_context_service.demo")
+
+    # When
+    await _server([]).startup()
+
+    # Then
+    assert caplog.messages == ["Demo running at http://x/demo/ (press Ctrl+C to stop)"]
+
+
+@pytest.mark.asyncio
+async def test_should_neither_open_nor_warn_when_the_browser_is_turned_off(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Given
+    monkeypatch.setattr(uvicorn.Server, "startup", _no_sockets)
+    caplog.set_level("INFO", logger="agentic_context_service.demo")
+    server = cli.BrowserOpeningServer(uvicorn.Config(lambda: None, port=0), "http://x/demo/", None)
+
+    # When
+    await server.startup()
+
+    # Then
+    assert caplog.messages == ["Demo running at http://x/demo/ (press Ctrl+C to stop)"]
 
 
 @pytest.mark.asyncio
