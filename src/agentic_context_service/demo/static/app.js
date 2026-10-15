@@ -184,24 +184,42 @@ async function ask(event) {
   }
   const button = $("[data-ask-button]");
   button.disabled = true;
+  showStatus("busy", "Asking the service…");
   try {
-    const reply = await fetch("api/ask", {
+    const payload = await getJson("api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ assistant: assistant.id, question, corpora }),
     });
-    const payload = await reply.json();
     renderRequest(payload.request);
     const returned = renderResponse(payload.response);
     renderRecords({ assistant, corpora, returned, refused: payload.response.status !== 200 });
+  } catch (error) {
+    showStatus("refused", `Could not reach the demo service: ${error.message}. Is make demo still running?`);
   } finally {
     button.disabled = false;
   }
 }
 
+function showStatus(tone, text) {
+  const status = $("[data-status]");
+  status.dataset.tone = tone;
+  status.textContent = text;
+}
+
+async function getJson(url, options) {
+  const reply = await fetch(url, options);
+  if (!reply.ok) throw new Error(`${reply.status} ${reply.statusText}`);
+  return reply.json();
+}
+
 async function start() {
-  const reply = await fetch("api/scenario");
-  state.scenario = await reply.json();
+  try {
+    state.scenario = await getJson("api/scenario");
+  } catch (error) {
+    showStatus("refused", `Could not load the demo data: ${error.message}. Restart it with make demo.`);
+    return;
+  }
   renderMode(state.scenario.mode);
   renderAssistants(state.scenario.assistants);
   renderCorpora();

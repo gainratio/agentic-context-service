@@ -93,7 +93,7 @@ make ui
 ```
 
 `make ui-install` took 1 second with Chromium already downloaded, and `make ui` took 3 seconds,
-ending in `3 passed`.
+ending in `4 passed`.
 
 ## 4. Map of the code
 

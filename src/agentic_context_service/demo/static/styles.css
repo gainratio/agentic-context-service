@@ -66,6 +66,7 @@ fieldset { margin: .4rem 0; padding: .6rem .8rem; border: 1px solid var(--line);
 .code { max-height: 24rem; margin: .6rem 0 0; padding: .8rem; overflow: auto; border: 1px solid var(--line); border-radius: .6rem; background: #050c18; color: #cfe0ff; font-size: .78rem; white-space: pre-wrap; word-break: break-word; }
 
 .status { margin-top: 1rem; padding: .6rem .8rem; border-radius: .6rem; background: rgba(103, 137, 199, .14); }
+.status[data-tone="busy"] { border-left: 3px solid var(--blue); }
 .status[data-tone="ok"] { border-left: 3px solid var(--teal); }
 .status[data-tone="empty"] { border-left: 3px solid var(--gold); }
 .status[data-tone="refused"] { border-left: 3px solid var(--red); color: #ffd3da; }

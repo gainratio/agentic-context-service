@@ -46,3 +46,14 @@ test("the support chatbot never sees the internal limit and is refused the prici
   await expect(page.locator("[data-results] li")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test("the page says so plainly when the demo service stops answering", async ({ page }) => {
+  await page.goto(DEMO_URL);
+  await expect(page.locator("body[data-ready=true]")).toBeVisible();
+  await page.route("**/demo/api/ask", (route) => route.abort());
+
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+
+  await expect(page.locator("[data-status]")).toContainText("Could not reach the demo service");
+  await expect(page.getByRole("button", { name: "Ask", exact: true })).toBeEnabled();
+});
