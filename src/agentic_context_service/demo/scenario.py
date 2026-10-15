@@ -179,13 +179,13 @@ EXAMPLES: Final = (
         "the pricing team may use, and each fact says where it came from.",
     ),
     Example(
-        "The customer help assistant asks the same thing", "support-bot",
+        "The customer help assistant asks the same discount question", "support-bot",
         "What is the discount limit for NS-100?", SUPPORT_CORPORA,
         "The help desk can tell a customer about the 15% sale, but it never sees the internal 20% "
         "limit that customers must not hear about.",
     ),
     Example(
-        "Another shop's assistant asks the same thing", "other-company-pricing",
+        "Another shop's assistant asks the same discount question", "other-company-pricing",
         "What is the discount limit for NS-100?", PRICING_CORPORA,
         "Two shops share one service, and neither can ever see the other's prices.",
     ),

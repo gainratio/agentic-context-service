@@ -43,9 +43,9 @@ fact, a return policy, an approved sale, a finance note, and a board plan. Pick 
 1. **The pricing assistant asks for a discount limit.** The 20% rule comes back first, with where
    it came from: record `NS-100` in the catalog database, version 7, two hours old. The finance
    note and the board plan are set aside.
-2. **The customer help assistant asks the same thing.** It does not get the internal 20% rule. It
+2. **The customer help assistant asks the same discount question.** It does not get the internal 20% rule. It
    gets the approved 15% sale, which the help desk may quote.
-3. **Another shop's assistant asks the same thing.** It gets only its own shop's rule.
+3. **Another shop's assistant asks the same discount question.** It gets only its own shop's rule.
 4. **The customer help assistant asks about returns.** It gets the return policy, which only the
    help desk may read.
 5. **The customer help assistant tries to open pricing rules.** Refused with `403
@@ -191,7 +191,7 @@ What to know when you wire it into a real assistant:
   `x-request-id`, `x-trace-id`, `x-acs-timestamp`; write each as `name:value` (lowercase name,
   trimmed value); join them with `\n`; and send the hex HMAC-SHA256 of that text as
   `X-ACS-Signature`. The timestamp is Unix seconds. The service refuses a signature older than
-  five minutes or more than 30 seconds in the future.
+  five minutes or more than 30 seconds in the future. The shared key must be at least 32 bytes.
 - **Each result carries its evidence.** `citation` names the source system, record, and version;
   `freshness` gives its age; `trust_class` says how much to trust it. Put these in the
   assistant's prompt so its answer can cite them.
@@ -224,11 +224,12 @@ returns the top passages with their sources and ages.
   it from this repository.
 - **It is not a chat app or a framework for building assistants.** It is the lookup your
   assistant calls.
-- **It knows one assistant out of the box.** The full stack accepts a single token
-  (`ACS_DEMO_TOKEN`). To give each of your assistants its own identity, plug in your own token
-  check by implementing `BearerAuthenticator` in
-  [`api/request_context.py`](src/agentic_context_service/api/request_context.py), for example
-  one that validates your identity provider's tokens.
+- **It knows one assistant out of the box.** The stock entry point (`bootstrap.py`) accepts a
+  single token, `ACS_DEMO_TOKEN`, and has no setting for more. To give each of your assistants
+  its own identity, implement `BearerAuthenticator` from
+  [`api/request_context.py`](src/agentic_context_service/api/request_context.py) (for example,
+  one that validates your identity provider's tokens) and pass it to
+  `create_app(authenticator=...)` from your own entry point.
 - **It is not the source of truth.** Your databases are. The index is updated a moment after the
   database changes, not in the same transaction.
 - **The local stack is for trying it, not for production.** It turns off TLS, private

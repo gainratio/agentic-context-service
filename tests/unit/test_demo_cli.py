@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import errno
 import runpy
 from pathlib import Path
 
@@ -92,6 +94,7 @@ def test_should_build_and_serve_the_app_when_the_policy_file_exists(
     served: list[int] = []
     opened: list[str] = []
     monkeypatch.setattr(uvicorn.Server, "startup", _no_sockets)
+    monkeypatch.setattr("socket.create_server", _free)
     monkeypatch.setattr("webbrowser.open", opened.append)
 
     def fake_run(self: cli.BrowserOpeningServer) -> None:
@@ -133,3 +136,37 @@ def test_should_start_the_demo_when_run_as_a_module(monkeypatch: pytest.MonkeyPa
 
     # Then
     assert calls == ["started"]
+
+
+def _busy(address: tuple[str, int]) -> contextlib.AbstractContextManager[None]:
+    raise OSError(errno.EADDRINUSE, f"{address} already in use")
+
+
+def _free(address: tuple[str, int]) -> contextlib.AbstractContextManager[None]:
+    del address
+    return contextlib.nullcontext()
+
+
+def test_should_say_how_to_pick_another_port_when_the_port_is_taken(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given
+    monkeypatch.setattr("socket.create_server", _busy)
+
+    # When / Then
+    with pytest.raises(SystemExit, match="Port 8090 is already in use"):
+        cli.main(["--no-browser", "--policy-data", str(POLICY_DATA)])
+
+
+def test_should_pass_other_bind_errors_through_when_they_are_not_a_busy_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given
+    def denied(address: tuple[str, int]) -> contextlib.AbstractContextManager[None]:
+        raise OSError(errno.EACCES, f"{address} permission denied")
+
+    monkeypatch.setattr("socket.create_server", denied)
+
+    # When / Then
+    with pytest.raises(PermissionError):
+        cli.main(["--no-browser", "--policy-data", str(POLICY_DATA)])

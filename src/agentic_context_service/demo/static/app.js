@@ -3,7 +3,7 @@
 // what happened to each record using the service's own permission check.
 
 const GROUPS = { pricing: "pricing rules", product: "product facts", support: "help-desk policies", "approved-decisions": "approved decisions" };
-const BADGES = { returned: "Sent", set_aside: "Blocked", not_searched: "Not searched", no_match: "Allowed, but not a match" };
+const BADGES = { returned: "Sent", set_aside: "Blocked", not_searched: "Not searched", no_match: "Allowed but did not match the question" };
 
 const $ = (selector) => document.querySelector(selector);
 const state = { scenario: null, example: null };

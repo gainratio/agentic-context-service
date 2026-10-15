@@ -44,7 +44,7 @@ test("the help desk never sees the internal limit and is refused the pricing rul
   const errors = watchForErrors(page);
   await page.goto(DEMO_URL);
 
-  await page.getByRole("button", { name: "The customer help assistant asks the same thing" }).click();
+  await page.getByRole("button", { name: "The customer help assistant asks the same discount question" }).click();
   await expect(page.locator("[data-results] li").first()).toBeVisible();
   await expect(page.locator("[data-results]")).not.toContainText("at most 20% off");
   await expect(page.locator("[data-results]")).toContainText("15% off until October 31");
@@ -62,7 +62,7 @@ test("the page says so plainly when the demo service stops answering", async ({ 
   await expect(page.locator("body[data-ready=true]")).toBeVisible();
   await page.route("**/demo/api/ask", (route) => route.abort());
 
-  await page.getByRole("button", { name: "Another shop's assistant asks the same thing" }).click();
+  await page.getByRole("button", { name: "Another shop's assistant asks the same discount question" }).click();
 
   await expect(page.locator("[data-status]")).toContainText("Could not reach the demo service");
 });

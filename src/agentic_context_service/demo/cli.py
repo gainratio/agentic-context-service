@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import logging
 import socket
 import sys
@@ -66,10 +67,25 @@ def main(argv: Sequence[str]) -> None:
         raise SystemExit(
             f"{options.policy_data} not found. Run `make demo` from the repository root."
         )
+    _require_free_port(options.host, options.port)
     app = create_demo_app(options.policy_data)
     config = uvicorn.Config(app, host=options.host, port=options.port)
     opener = webbrowser.open if options.open_browser else _skip_browser
     BrowserOpeningServer(config, options.url, opener).run()
+
+
+def _require_free_port(host: str, port: int) -> None:
+    """Fail with a plain next step instead of uvicorn's raw bind error."""
+    try:
+        with socket.create_server((host, port)):
+            pass
+    except OSError as error:
+        if error.errno != errno.EADDRINUSE:
+            raise
+        raise SystemExit(
+            f"Port {port} is already in use. Stop the other demo, "
+            f"or run `uv run acs-demo --port {port + 5}`."
+        ) from error
 
 
 def _skip_browser(url: str) -> None:

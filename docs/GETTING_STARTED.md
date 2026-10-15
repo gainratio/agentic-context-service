@@ -21,7 +21,7 @@ Local traps we actually hit:
 - **Plain `uv sync` is not enough for the full check.** It skips the optional `agent` extra, and
   one unit test then fails with `ModuleNotFoundError: No module named 'pydantic_ai'`. Use
   `make bootstrap` (which runs `uv sync --all-extras --all-groups`).
-- **Ports.** `make demo` uses 8090, and `make ui` starts its own servers on 8081 and 8091. The
+- **Ports.** `make demo` uses 8090 (if it is busy, the demo says so; run `uv run acs-demo --port 8095`), and `make ui` starts its own servers on 8081 and 8091. The
   Docker stack binds 8080, 5432, 9200, 19092 and others, and its Compose project is always named
   `agentic-context-service`, so only one checkout's stack can run at a time. Stop another one with
   `make down` in that checkout.
@@ -78,7 +78,7 @@ pip-audit), and the offline retrieval evaluation.
 It took 13 to 18 seconds. The test lines in a passing run look like this:
 
 ```text
-====================== 321 passed, 5 deselected in 3.07s =======================
+====================== 323 passed, 5 deselected in 2.97s =======================
 ================= 1 passed, 2 skipped, 55 deselected in 1.25s ==================
 ============================== 2 passed in 0.65s ===============================
 Evaluation PASS: 3 queries -> .../reports/evaluation.json

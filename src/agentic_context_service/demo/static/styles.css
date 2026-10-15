@@ -75,7 +75,7 @@ button:disabled { cursor: progress; opacity: .6; }
 .record-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem .8rem; }
 .record-reason { margin-top: .2rem; }
 .record-meta { margin-top: .15rem; color: var(--muted); font-size: .82rem; }
-.badge { padding: .1rem .6rem; border-radius: 999px; font-size: .85rem; font-weight: 700; white-space: nowrap; }
+.badge { padding: .1rem .6rem; border-radius: 999px; font-size: .85rem; font-weight: 700; }
 .badge.returned { color: #07101f; background: var(--teal); }
 .badge.set_aside { color: #07101f; background: var(--gold); }
 .badge.not_searched { color: var(--ink); background: rgba(150, 160, 180, .35); }
