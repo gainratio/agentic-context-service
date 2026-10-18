@@ -212,6 +212,24 @@ so the code and output above cannot drift.
 
 ## How it works
 
+```mermaid
+flowchart LR
+    S["Company databases<br/>(PostgreSQL, the source of truth)"] -->|each change published once| I["Indexer<br/>chunk, embed, version"]
+    I --> O["Search index<br/>(OpenSearch)"]
+    A["AI assistant"] -->|one signed request| C["Context Service<br/>permissions first, then ranking"]
+    C --> O
+    C -->|cited, dated answers| A
+
+    classDef blue fill:#e8f4f8,stroke:#7aa7b8,color:#171717
+    classDef green fill:#e8f8e8,stroke:#7ab87a,color:#171717
+    classDef orange fill:#f8f0e8,stroke:#b8987a,color:#171717
+    classDef purple fill:#f0e8f8,stroke:#9a7ab8,color:#171717
+    class S orange
+    class I,O blue
+    class C green
+    class A purple
+```
+
 Changes in PostgreSQL are picked up from the database's change log (Debezium) and passed through
 a queue (Redpanda) to an indexer. The indexer splits each record into chunks and stores them in
 OpenSearch with the record's version, so a late or replayed change never overwrites a newer one
@@ -276,6 +294,8 @@ http://localhost:8080/showcase/. Stop it with `make down`. Details are in
 [operations](docs/operations.md).
 
 ## Develop
+
+Run `make bootstrap` (`uv sync --all-extras --all-groups`) first so every optional adapter and test dependency is installed before `make verify`:
 
 ```bash
 make bootstrap
