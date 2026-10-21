@@ -324,3 +324,4 @@ def test_await_initial_context_surfaces_http_errors_immediately(
 
     with pytest.raises(urllib.error.HTTPError):
         run_demo._await_initial_context()
+    denied.close()
