@@ -1,6 +1,6 @@
-FROM ghcr.io/astral-sh/uv:0.13.1 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
 
-FROM python:3.13.16-slim AS runtime
+FROM python:3.13.17-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
