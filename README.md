@@ -210,6 +210,17 @@ The [API contract](packages/contracts/openapi.yaml) lists every route and field,
 and search assistant memory (`/v1/memories`). A test runs this exact file against the service,
 so the code and output above cannot drift.
 
+---
+
+## Under the hood (for developers)
+
+For developers exploring the repository layout and policy stack:
+
+- [`src/agentic_context_service/`](src/agentic_context_service/demo/): FastAPI routes, bearer/HMAC request verification, OPA policy adapter, OpenSearch retrieval adapter, memory endpoints, and the offline browser demo.
+- [`policies/`](policies/context/data.json): Open Policy Agent (Rego) rules and fixture data tested in CI.
+- [`connectors/`](deploy/compose/docker-compose.yml) & `deploy/`: Debezium PostgreSQL change-log config, Redpanda queue, OpenSearch, and local Compose stack.
+- [`packages/contracts/openapi.yaml`](packages/contracts/openapi.yaml) & [`.env.example`](.env.example): full HTTP schema and local configuration defaults (`cp .env.example .env`).
+
 ## How it works
 
 ```mermaid

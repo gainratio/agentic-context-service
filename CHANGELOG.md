@@ -5,6 +5,12 @@ versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed `AGENTS.md` to canonical `CLAUDE.md` and added `## Under the hood (for developers)` source-layout overview in `README.md`.
+
+## [0.1.0] - 2026-11-10
+
 ### Added
 
 - `make demo` opens an offline browser demo: three assistants from two companies ask questions
