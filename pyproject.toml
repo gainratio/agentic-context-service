@@ -11,7 +11,17 @@ requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Harish Seshadri" }]
-keywords = ["agents", "context-engineering", "opensearch", "rag", "cdc"]
+keywords = [
+  "agents",
+  "ai-agents",
+  "cdc",
+  "context-engineering",
+  "fastapi",
+  "governance",
+  "opa",
+  "opensearch",
+  "rag",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "License :: OSI Approved :: MIT License",

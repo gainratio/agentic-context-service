@@ -17,7 +17,7 @@ SIGNING_KEY = "ACS_SIGNING_" + "SECRET"
 def test_required_oss_files_exist() -> None:
     required = {
         ".env.example",
-        "AGENTS.md",
+        "CLAUDE.md",
         "CODE_OF_CONDUCT.md",
         "CONTRIBUTING.md",
         "LICENSE",
