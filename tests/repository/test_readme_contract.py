@@ -132,8 +132,8 @@ def test_try_it_output_is_the_real_output(capsys: pytest.CaptureFixture[str]) ->
 
 
 def test_demo_screenshot_sits_in_the_intro_and_exists() -> None:
-    assert "](docs/assets/demo.png)" in _intro()
-    assert (ROOT / "docs/assets/demo.png").is_file()
+    assert "](docs/assets/live-demo.gif)" in _intro()
+    assert (ROOT / "docs/assets/live-demo.gif").is_file()
 
 
 def test_try_it_starts_the_browser_demo_and_names_its_mode() -> None:
