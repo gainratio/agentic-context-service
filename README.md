@@ -19,7 +19,9 @@ passage names its source record, version, and age. You run it on your own machin
 
 **Technical docs:** [Architecture](docs/ARCHITECTURE.md) · [Getting started for developers](docs/GETTING_STARTED.md) · [API contract](packages/contracts/openapi.yaml) · [Threat model](docs/threat-model/README.md)
 
-![The demo page after the pricing assistant asks "What is the discount limit for NS-100?": four plain steps show the question, what the service did (checked the signature, blocked 4 of 7 records), the 3 facts sent back with their sources, and why it matters](docs/assets/demo.png)
+![The demo page after the pricing assistant asks "What is the discount limit for NS-100?": four plain steps show the question, what the service did (checked the signature, blocked 4 of 7 records), the 3 facts sent back with their sources, and why it matters](docs/assets/live-demo.gif)
+
+**[Watch the 1080p walkthrough](https://open-source.gainratio.com/agentic-context-service/)** · **[30-second Safe Local Agents overview](https://open-source.gainratio.com/safe-local-agents/)**
 
 ## Try it
 
